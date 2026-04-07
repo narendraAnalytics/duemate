@@ -22,10 +22,10 @@ export default function Navbar() {
           <Image
             src="https://res.cloudinary.com/dkqbzwicr/image/upload/q_auto/f_auto/v1775557266/logo_y06zwe.png"
             alt="DueMate"
-            width={140}
-            height={36}
+            width={180}
+            height={48}
             priority
-            className="h-8 w-auto"
+            className="h-10 sm:h-12 w-auto"
           />
         </Link>
 
@@ -79,26 +79,26 @@ export default function Navbar() {
 
         {/* Mobile hamburger */}
         <button
+          type="button"
           onClick={() => setOpen(!open)}
           className="md:hidden flex flex-col gap-1.5 p-2 min-w-[44px] min-h-[44px] items-center justify-center rounded-lg"
           aria-label={open ? "Close menu" : "Open menu"}
-          aria-expanded={open}
         >
           <motion.span
             animate={{ rotate: open ? 45 : 0, y: open ? 8 : 0 }}
-            className="block w-5 h-px rounded-full origin-center"
+            className="block w-5 h-0.5 rounded-full origin-center"
             style={{ background: "var(--color-text)" }}
             transition={{ duration: 0.25 }}
           />
           <motion.span
             animate={{ opacity: open ? 0 : 1, scaleX: open ? 0 : 1 }}
-            className="block w-5 h-px rounded-full"
+            className="block w-5 h-0.5 rounded-full"
             style={{ background: "var(--color-text)" }}
             transition={{ duration: 0.25 }}
           />
           <motion.span
             animate={{ rotate: open ? -45 : 0, y: open ? -8 : 0 }}
-            className="block w-5 h-px rounded-full origin-center"
+            className="block w-5 h-0.5 rounded-full origin-center"
             style={{ background: "var(--color-text)" }}
             transition={{ duration: 0.25 }}
           />

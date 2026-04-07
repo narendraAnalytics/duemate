@@ -1,10 +1,5 @@
 videosurl :
-
-1 . https://res.cloudinary.com/dkqbzwicr/video/upload/q_auto/f_auto/v1775557004/video1_xu3ii2.webm
-
-2 . https://res.cloudinary.com/dkqbzwicr/video/upload/q_auto/f_auto/v1775556989/video2_gtu47v.webm
-
-3. https://res.cloudinary.com/dkqbzwicr/video/upload/q_auto/f_auto/v1775556989/video3_dzpexe.webm
+1. https://res.cloudinary.com/dkqbzwicr/video/upload/q_auto/f_auto/v1775556989/video3_dzpexe.webm
 
 logo url : 
 

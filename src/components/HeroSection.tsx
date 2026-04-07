@@ -74,7 +74,7 @@ export default function HeroSection() {
 
       {/* Hero content — bottom-anchored like pendragoncycle */}
       <div
-        className="relative flex flex-col justify-end h-full px-4 sm:px-8 lg:px-14 pb-10 sm:pb-14 lg:pb-16"
+        className="relative flex flex-col justify-end h-full px-4 sm:px-8 lg:px-14 pb-20 sm:pb-20 lg:pb-24"
         style={{ zIndex: 10 }}
       >
         {/* Overline */}
@@ -89,7 +89,7 @@ export default function HeroSection() {
         </motion.p>
 
         {/* Main headline — Bebas Neue, cinematic stagger */}
-        <div className="flex flex-col leading-none mb-6 sm:mb-9">
+        <div className="flex flex-col leading-none mb-4 sm:mb-7">
           {HEADLINE.map((word, i) => (
             <div key={word} className="overflow-hidden">
               <motion.h1
@@ -122,7 +122,7 @@ export default function HeroSection() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1.1, duration: 0.7 }}
-            className="max-w-[22rem] text-sm sm:text-base leading-relaxed"
+            className="max-w-[18rem] sm:max-w-[22rem] text-sm sm:text-base leading-relaxed"
             style={{ color: "rgba(196, 207, 238, 0.6)" }}
           >
             Upload invoices, let AI extract data, then sit back as smart
@@ -154,13 +154,13 @@ export default function HeroSection() {
             </Link>
 
             <div
-              className="w-px h-5 opacity-25"
+              className="hidden sm:block w-px h-5 opacity-25"
               style={{ background: "var(--color-text)" }}
             />
 
             <Link
               href="#features"
-              className="text-sm font-medium transition-colors duration-200"
+              className="hidden sm:inline text-sm font-medium transition-colors duration-200"
               style={{ color: "rgba(196, 207, 238, 0.55)" }}
               onMouseEnter={(e) =>
                 (e.currentTarget.style.color = "rgba(196, 207, 238, 0.9)")
@@ -183,7 +183,7 @@ export default function HeroSection() {
         transition={{ delay: 1.4, duration: 0.6 }}
         onClick={toggleMute}
         aria-label={muted ? "Unmute video" : "Mute video"}
-        className="absolute bottom-10 right-5 sm:bottom-14 sm:right-8 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 hover:scale-105 active:scale-95"
+        className="absolute bottom-20 right-4 sm:bottom-16 sm:right-8 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 hover:scale-105 active:scale-95"
         style={{
           background: "rgba(13, 20, 38, 0.55)",
           backdropFilter: "blur(12px)",

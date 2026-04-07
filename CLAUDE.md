@@ -1,4 +1,6 @@
-# DueMate — Claude Code Context 
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project
 AI-powered payment reminder SaaS. Users create or upload invoices, Gemini 3.1 Flash-Lite extracts data, Inngest schedules multi-channel reminders, Resend + Meta WhatsApp Cloud API deliver them automatically.
@@ -7,26 +9,34 @@ AI-powered payment reminder SaaS. Users create or upload invoices, Gemini 3.1 Fl
 For ALL frontend/UI work — landing page, dashboard, components, emails — use the skill at:
 `C:\Users\ES\.claude\skills\reactwebsite.skill`
 
-# use playwright mcpserver
-For this link : https://pendragoncycle.com/
-
 This skill defines the color system, typography, animation stack, component patterns, and quality standards. Read it before writing any UI code. Do not deviate from its rules.
+
+When examining UI references, use the Playwright MCP server to screenshot and inspect the target site.
+
+## Dev Commands
+```bash
+npm run dev            # Next.js dev server (Turbopack) — port 3000
+npx inngest-cli dev    # Inngest dev server — port 8288 (required locally)
+npx drizzle-kit push   # Push schema to Neon (use DATABASE_URL_UNPOOLED)
+npx drizzle-kit studio # Visual DB browser
+npx tsc --noEmit       # Type-check without building
+```
 
 ## Stack
 
 ### Frontend
-- Next.js 15 (App Router, TypeScript, Turbopack)
+- Next.js 16 (App Router, TypeScript, Turbopack)
 - Tailwind CSS v4 — `@import 'tailwindcss'` syntax, no config file needed
 - Framer Motion — page/component animations
 - GSAP + Lenis — feature slider sweeps, smooth scroll
-- Fonts: **Bebas Neue** (headings) + **Space Grotesk** (body) via Google Fonts
+- Fonts: **Bebas Neue** (`--font-display`, `font-heading`) + **Space Grotesk** (`--font-body`, `font-sans`) via `next/font/google`
 - shadcn/ui — accessible pre-built components
 - Lucide React — icons
 - React Hook Form + Zod — type-safe form validation
 - Recharts — dashboard charts
 
 ### Backend
-- Next.js 15 API Routes (App Router)
+- Next.js 16 API Routes (App Router)
 - Clerk — auth, middleware route protection. **NO webhooks. NO CLERK_WEBHOOK_SECRET.**
 - Drizzle ORM — type-safe schema-first SQL
 - Neon PostgreSQL — serverless, connection pooling
@@ -40,6 +50,21 @@ This skill defines the color system, typography, animation stack, component patt
 ### Infrastructure
 - Vercel — hosting + CI/CD
 - ImageKit — CDN + file storage for invoice PDFs/images
+- Cloudinary — video/image CDN for landing page assets
+
+## Implemented Design System (`src/app/globals.css`)
+
+```css
+--color-bg: #070A12        /* dark navy page background */
+--color-surface: #0D1426   /* card/panel surface */
+--color-primary: #818CF8   /* indigo — brand accent */
+--color-secondary: #F59E0B /* amber/gold — supporting accent */
+--color-text: #C4CFEE      /* cool lavender-white body text */
+```
+
+Fluid type scale is defined in `:root` via CSS `clamp()` — `--text-xs` through `--text-hero`. Use these for headings instead of fixed `px` values.
+
+`html, body` have `overflow: hidden` — the landing page uses fullscreen sections (`height: 100svh`), not traditional scroll.
 
 ## Auth — CRITICAL
 - NO Clerk webhooks anywhere in the codebase
@@ -50,7 +75,6 @@ This skill defines the color system, typography, animation stack, component patt
 - Model: `gemini-3.1-flash-lite-preview`
 - Config: `responseMimeType: 'application/json'`, `temperature: 0.1`
 - File: `lib/gemini.ts` → `extractInvoiceData(fileBase64, mimeType)`
-- Handles both digital PDFs and scanned images natively — no external OCR tool
 
 ## Inngest — 3 Functions
 1. **notifyOwner** — event: `invoice/created`, immediate confirmation email to the invoice owner
@@ -67,19 +91,23 @@ Trigger flow: User submits invoice → DB insert → `inngest.send('invoice/crea
 - **reminder_settings** — userId FK, 7 boolean timing toggles, emailEnabled, whatsappEnabled, customMessage, senderName
 - **notifications** — audit log, userId FK, reminderId FK, channel, recipient, subject, status (delivered/bounced/failed/read), externalId (Resend/Meta message ID), sentAt
 
-Run migrations with: `npx drizzle-kit push` (use `DATABASE_URL_UNPOOLED`)
+Run migrations: `npx drizzle-kit push` (use `DATABASE_URL_UNPOOLED`)
 
 ## WhatsApp
 - Provider: Meta WhatsApp Cloud API — **NOT Twilio, no BSP markup**
 - Endpoint: `https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages`
 - Auth: Bearer `META_WHATSAPP_ACCESS_TOKEN`
 - Template: `payment_reminder` (UTILITY category — must be Meta-approved)
-- Webhook: `GET /api/webhooks/whatsapp` (verify) + `POST` (delivery status)
 - Code: `lib/whatsapp.ts` → `sendWhatsAppReminder()` — native fetch, no SDK
 
 ## Key File Paths
 | File | Purpose |
 |---|---|
+| `src/app/globals.css` | Color system, fluid type scale, global resets |
+| `src/app/layout.tsx` | Font setup (Bebas Neue + Space Grotesk), metadata |
+| `src/app/page.tsx` | Public landing page — assembles Navbar + sections |
+| `src/components/Navbar.tsx` | Fixed transparent navbar, mobile hamburger drawer |
+| `src/components/HeroSection.tsx` | Fullscreen video hero, mute toggle, animated headline |
 | `lib/auth.ts` | `getOrCreateUser()` lazy sync |
 | `lib/gemini.ts` | Gemini 3.1 extraction |
 | `lib/email.ts` | Resend sender functions |
@@ -94,60 +122,16 @@ Run migrations with: `npx drizzle-kit push` (use `DATABASE_URL_UNPOOLED`)
 | `app/api/invoices/extract/route.ts` | POST: Gemini AI extraction |
 | `app/api/inngest/route.ts` | Serve 3 Inngest functions |
 | `app/api/webhooks/whatsapp/route.ts` | Meta webhook handler |
-| `app/page.tsx` | Public landing page |
+| `next.config.ts` | Image domains: `res.cloudinary.com` allowed |
 
-## Project Structure
-```
-app/
-  (auth)/sign-in/[[...sign-in]]/page.tsx
-  (auth)/sign-up/[[...sign-up]]/page.tsx
-  (dashboard)/dashboard/page.tsx          # Stats + recent invoices
-  (dashboard)/invoices/page.tsx           # Invoice list + filters
-  (dashboard)/invoices/new/page.tsx       # Create form + file upload
-  (dashboard)/invoices/[id]/page.tsx      # Detail + reminder timeline
-  (dashboard)/customers/page.tsx
-  (dashboard)/settings/page.tsx
-  api/inngest/route.ts
-  api/invoices/route.ts
-  api/invoices/[id]/route.ts
-  api/invoices/[id]/mark-paid/route.ts
-  api/invoices/extract/route.ts
-  api/customers/route.ts
-  api/upload/route.ts
-  api/webhooks/resend/route.ts
-  api/webhooks/whatsapp/route.ts
-  layout.tsx
-  page.tsx                                # Public landing page
-components/
-  dashboard/StatsCards.tsx
-  dashboard/InvoiceTable.tsx
-  dashboard/InvoiceStatusBadge.tsx
-  dashboard/ReminderTimeline.tsx
-  invoices/InvoiceForm.tsx
-  invoices/FileUpload.tsx
-  invoices/ExtractedPreview.tsx
-  ui/                                     # shadcn/ui components
-emails/
-  PaymentReminderEmail.tsx
-  OwnerConfirmationEmail.tsx
-  OverdueNoticeEmail.tsx
-inngest/
-  client.ts
-  functions/notifyOwner.ts
-  functions/scheduleReminders.ts
-  functions/checkOverdue.ts
-lib/
-  auth.ts
-  gemini.ts
-  email.ts
-  whatsapp.ts
-  imagekit.ts
-  utils.ts
-  db/index.ts
-  db/schema.ts
-drizzle.config.ts
-middleware.ts
-```
+## Landing Page Architecture
+The public landing page (`src/app/page.tsx`) is built as fullscreen sections — no page scroll. Each section fills `100svh`. Navigation between sections will use JS-driven snap or button controls (not CSS scroll-snap, since `overflow: hidden` is on body).
+
+Components live in `src/components/` (not `src/app/components/`). Each major section is its own file:
+- `Navbar.tsx` — fixed, z-50, transparent (no background), floats over the hero
+- `HeroSection.tsx` — video background, Framer Motion headline stagger, mute toggle
+
+Future sections to build: Features, How It Works, Pricing, Footer.
 
 ## Coding Standards
 - TypeScript strict mode throughout
@@ -157,14 +141,7 @@ middleware.ts
 - Phone numbers always E.164 format (`+919876543210`)
 - Never expose secrets client-side
 - No `twilio` package anywhere
-
-## Dev Commands
-```bash
-npm run dev          # Next.js dev server (Turbopack)
-npx inngest-cli dev  # Inngest dev server — port 8288 (required locally)
-npx drizzle-kit push # Push schema to Neon (use DATABASE_URL_UNPOOLED)
-npx drizzle-kit studio # Visual DB browser
-```
+- Buttons inside non-form contexts must have `type="button"`
 
 ## Environment Variables
 See `.env.local` (never commit). Key groups:
