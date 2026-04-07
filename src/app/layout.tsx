@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bebas_Neue, Space_Grotesk, Cormorant_Garamond } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
 const display = Bebas_Neue({
@@ -44,7 +45,9 @@ export default function RootLayout({
       lang="en"
       className={`${display.variable} ${body.variable} ${serif.variable} h-full`}
     >
-      <body className="h-full overflow-hidden antialiased">{children}</body>
+      <body className="h-full overflow-hidden antialiased">
+        <ClerkProvider>{children}</ClerkProvider>
+      </body>
     </html>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 
 const VIDEOS = [
   "https://res.cloudinary.com/dkqbzwicr/video/upload/q_auto/f_auto/v1775562834/video2_lvfcfh.webm",
@@ -14,6 +15,8 @@ const HEADLINE = ["GET PAID.", "ON TIME.", "EVERY TIME."];
 const FLIP_DURATION = 0.9; // seconds
 
 export default function HeroSection() {
+  const { isSignedIn, user } = useUser();
+  const displayName = user?.username ?? user?.firstName ?? "there";
   const [muted, setMuted] = useState(true);
   const [activeIdx, setActiveIdx] = useState(0);
   const [flipping, setFlipping] = useState(false);
@@ -149,6 +152,30 @@ export default function HeroSection() {
               }}
             />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Welcome message — absolutely positioned, zero layout impact */}
+      <AnimatePresence>
+        {isSignedIn && (
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="absolute w-full text-center px-4"
+            style={{
+              bottom: "11rem",
+              zIndex: 11,
+              fontFamily: "var(--font-serif)",
+              fontStyle: "italic",
+              letterSpacing: "0.05em",
+              fontSize: "clamp(1.4rem, 3vw, 2rem)",
+              color: "var(--color-secondary)",
+            }}
+          >
+            Welcome back, {displayName} —
+          </motion.p>
         )}
       </AnimatePresence>
 

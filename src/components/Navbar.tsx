@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { UserButton, Show, useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 
 const NAV_LINKS = [
   { href: "#features",     label: "Features",     numeral: "I" },
@@ -54,6 +56,17 @@ function useTextScramble(original: string) {
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { text: menuText, scramble, reset } = useTextScramble("Menu");
+  const { isSignedIn } = useUser();
+  const router = useRouter();
+
+  const handleNavClick = (href: string) => {
+    setMenuOpen(false);
+    if (!isSignedIn) {
+      router.push("/sign-in");
+      return;
+    }
+    router.push(href);
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -103,6 +116,11 @@ export default function Navbar() {
               style={{ background: "rgba(196, 207, 238, 0.4)" }}
             />
           </button>
+
+          {/* UserButton — visible after Menu when signed in */}
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
         </nav>
       </header>
 
@@ -180,15 +198,16 @@ export default function Navbar() {
                         ease: [0.16, 1, 0.3, 1],
                       }}
                     >
-                      <Link
-                        href={link.href}
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-baseline gap-5 py-5 group/item"
+                      <button
+                        type="button"
+                        onClick={() => handleNavClick(link.href)}
+                        className="flex items-baseline gap-5 py-5 w-full text-left group/item"
                         style={{
-                          borderBottom:
-                            index < NAV_LINKS.length - 1
-                              ? "1px solid rgba(129, 140, 248, 0.08)"
-                              : "none",
+                          background: "none",
+                          border: "none",
+                          borderBottom: index < NAV_LINKS.length - 1
+                            ? "1px solid rgba(129, 140, 248, 0.08)"
+                            : "none",
                         }}
                       >
                         {/* Roman numeral */}
@@ -228,7 +247,7 @@ export default function Navbar() {
                         >
                           {link.label}
                         </span>
-                      </Link>
+                      </button>
                     </motion.li>
                   ))}
                 </ul>
