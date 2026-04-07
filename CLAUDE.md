@@ -1,4 +1,4 @@
-# DueMate — Claude Code Context (v1.1 Final)
+# DueMate — Claude Code Context 
 
 ## Project
 AI-powered payment reminder SaaS. Users create or upload invoices, Gemini 3.1 Flash-Lite extracts data, Inngest schedules multi-channel reminders, Resend + Meta WhatsApp Cloud API deliver them automatically.
@@ -6,6 +6,9 @@ AI-powered payment reminder SaaS. Users create or upload invoices, Gemini 3.1 Fl
 ## Design Skill
 For ALL frontend/UI work — landing page, dashboard, components, emails — use the skill at:
 `C:\Users\ES\.claude\skills\reactwebsite.skill`
+
+# use playwright mcpserver
+For this link : https://pendragoncycle.com/
 
 This skill defines the color system, typography, animation stack, component patterns, and quality standards. Read it before writing any UI code. Do not deviate from its rules.
 

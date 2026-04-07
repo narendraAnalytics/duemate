@@ -1,0 +1,18 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - main [ref=e3]:
+      - generic: The The The The The
+      - button "Enable sound" [ref=e4] [cursor=pointer]:
+        - generic [ref=e5]: Enable sound
+      - article [ref=e6]:
+        - generic "We're loading the experience." [ref=e8]: "44"
+        - paragraph [ref=e12]:
+          - generic [ref=e14]:
+            - generic [ref=e15]: Click
+            - generic [ref=e16]: anywhere
+            - generic [ref=e17]: to
+            - generic [ref=e18]: enable
+            - generic [ref=e19]: sound
+          - generic [ref=e20]: Click anywhere to enable sound
+    - article
+  - alert [ref=e26]

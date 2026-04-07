@@ -1,0 +1,46 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - main [ref=e3]:
+      - generic [ref=e27]:
+        - button "Toggle menu" [ref=e28] [cursor=pointer]: Menu
+        - button "Mute" [ref=e29] [cursor=pointer]:
+          - generic [ref=e36]: Mute
+      - generic: The The The The The
+      - article:
+        - heading "Now streaming on DailyWire+" [level=1]
+        - generic:
+          - navigation:
+            - paragraph:
+              - link "Terms of Use" [ref=e37] [cursor=pointer]:
+                - /url: /legal/terms-of-use/
+              - text: "&"
+              - link "Privacy Policy" [ref=e38] [cursor=pointer]:
+                - /url: /legal/privacy-policy/
+        - generic:
+          - link "Get Access" [ref=e39] [cursor=pointer]:
+            - /url: https://get.dailywire.com/pendragon-cycle/?utm_campaign=pendragon&utm_medium=website&utm_source=na&utm_content=20251218_pendragoncycle_companionsite
+            - generic [ref=e40]: Get Access
+            - img [ref=e41]
+          - generic:
+            - img "The Pendragon Cycle - Rise of the Merlin"
+          - button "View trailer" [ref=e52] [cursor=pointer]:
+            - generic [ref=e53]: View trailer
+            - img [ref=e54]
+        - generic:
+          - generic:
+            - img "Merlin"
+            - generic:
+              - button "Close" [active] [ref=e65] [cursor=pointer]:
+                - img [ref=e66]
+                - generic [ref=e68]: Close
+              - heading "Step Into the Legend" [level=2]
+              - paragraph:
+                - text: Become one of the characters in
+                - emphasis: "The Pendragon Cycle: Rise of the Merlin"
+              - link "Start Now" [ref=e69] [cursor=pointer]:
+                - /url: https://legend.pendragoncycle.com/
+    - button "Enter the story" [ref=e71]:
+      - generic [ref=e72]: Enter the story
+    - article
+  - alert [ref=e26]
+  - generic: Cookie Settings‎ ‎ ‎ ‎ ‎ ‎
