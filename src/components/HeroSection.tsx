@@ -1,39 +1,82 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 
 const VIDEOS = [
+  "https://res.cloudinary.com/dkqbzwicr/video/upload/q_auto/f_auto/v1775562834/video2_lvfcfh.webm",
   "https://res.cloudinary.com/dkqbzwicr/video/upload/q_auto/f_auto/v1775556989/video3_dzpexe.webm",
 ];
 
 const HEADLINE = ["GET PAID.", "ON TIME.", "EVERY TIME."];
 
+const FLIP_DURATION = 0.9; // seconds
+
 export default function HeroSection() {
   const [muted, setMuted] = useState(true);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [flipping, setFlipping] = useState(false);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
+  // When active video changes: restart it from 0, manage loop & mute for all videos
   useEffect(() => {
-    videoRefs.current.forEach((v) => {
-      if (v) {
+    videoRefs.current.forEach((v, i) => {
+      if (!v) return;
+      if (i === activeIdx) {
+        v.loop = false;       // play once — ended event triggers the flip
+        v.currentTime = 0;   // always start from beginning
+        v.muted = muted;
+        v.play().catch(() => {});
+      } else {
+        v.loop = true;        // inactive video loops silently, stays warm
         v.muted = true;
         v.play().catch(() => {});
       }
     });
+  }, [activeIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep active video mute state in sync when user toggles
+  useEffect(() => {
+    const v = videoRefs.current[activeIdx];
+    if (v) v.muted = muted;
+  }, [muted, activeIdx]);
+
+  // Pause ALL videos when tab hidden, resume when visible — no stale closure
+  useEffect(() => {
+    const handleVisibility = () => {
+      videoRefs.current.forEach((v) => {
+        if (!v) return;
+        if (document.hidden) {
+          v.pause();
+        } else {
+          v.play().catch(() => {});
+        }
+      });
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, []);
 
-  const toggleMute = () => {
-    const next = !muted;
-    setMuted(next);
-    videoRefs.current.forEach((v) => {
-      if (v) v.muted = next;
-    });
-  };
+  // Trigger page flip when active video naturally ends
+  useEffect(() => {
+    const v = videoRefs.current[activeIdx];
+    if (!v) return;
+    const handleEnded = () => {
+      setFlipping(true);
+      setTimeout(() => {
+        setActiveIdx((prev) => (prev + 1) % VIDEOS.length);
+      }, (FLIP_DURATION / 2) * 1000);
+    };
+    v.addEventListener("ended", handleEnded);
+    return () => v.removeEventListener("ended", handleEnded);
+  }, [activeIdx]);
+
+  const toggleMute = () => setMuted((prev) => !prev);
 
   return (
     <section className="relative w-full overflow-hidden flex flex-col" style={{ height: "100svh" }}>
-      {/* Video backgrounds — crossfade */}
+      {/* Video backgrounds — active one sits on top */}
       {VIDEOS.map((src, i) => (
         <video
           key={src}
@@ -46,8 +89,8 @@ export default function HeroSection() {
           playsInline
           className="absolute inset-0 w-full h-full object-cover"
           style={{
+            zIndex: activeIdx === i ? 1 : 0,
             opacity: 1,
-            zIndex: 0,
           }}
         />
       ))}
@@ -58,7 +101,7 @@ export default function HeroSection() {
         style={{
           background:
             "linear-gradient(to bottom, rgba(7,10,18,0.6) 0%, rgba(7,10,18,0.15) 35%, rgba(7,10,18,0.65) 65%, rgba(7,10,18,0.97) 100%)",
-          zIndex: 1,
+          zIndex: 2,
         }}
       />
 
@@ -71,6 +114,43 @@ export default function HeroSection() {
           zIndex: 2,
         }}
       />
+
+      {/* Book page-turn transition overlay */}
+      <AnimatePresence>
+        {flipping && (
+          <motion.div
+            key="page-flip"
+            initial={{ x: "102%", skewX: "-2deg" }}
+            animate={{ x: "-102%", skewX: "-2deg" }}
+            exit={{}}
+            transition={{ duration: FLIP_DURATION, ease: [0.76, 0, 0.24, 1] }}
+            onAnimationComplete={() => setFlipping(false)}
+            className="absolute inset-0"
+            style={{ zIndex: 3 }}
+          >
+            {/* Page body */}
+            <div className="absolute inset-0" style={{ background: "#070A12" }} />
+            {/* Fold shadow — leading left edge (dark crease like paper fold) */}
+            <div
+              className="absolute inset-y-0 left-0"
+              style={{
+                width: "90px",
+                background:
+                  "linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 60%, transparent 100%)",
+              }}
+            />
+            {/* Highlight — trailing right edge (paper catching light) */}
+            <div
+              className="absolute inset-y-0 right-0"
+              style={{
+                width: "50px",
+                background:
+                  "linear-gradient(to left, rgba(129,140,248,0.12) 0%, transparent 100%)",
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Hero content — bottom-anchored like pendragoncycle */}
       <div
@@ -129,7 +209,7 @@ export default function HeroSection() {
             reminders go out via email &amp; WhatsApp — automatically.
           </motion.p>
 
-          {/* CTAs — styled like pendragoncycle "Get Access" */}
+          {/* CTAs */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -143,7 +223,7 @@ export default function HeroSection() {
             >
               <span>Start Free</span>
               <span
-                className="flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 group-hover:scale-110 group-hover:border-opacity-80"
+                className="flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 group-hover:scale-110"
                 style={{
                   border: "1px solid rgba(196, 207, 238, 0.35)",
                   fontSize: "1.1rem",
@@ -173,11 +253,11 @@ export default function HeroSection() {
             </Link>
           </motion.div>
         </div>
-
       </div>
 
-      {/* Mute / Unmute toggle — top right */}
+      {/* Mute / Unmute toggle */}
       <motion.button
+        type="button"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.4, duration: 0.6 }}
@@ -193,14 +273,12 @@ export default function HeroSection() {
         }}
       >
         {muted ? (
-          /* Speaker off */
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
             <line x1="23" y1="9" x2="17" y2="15" />
             <line x1="17" y1="9" x2="23" y2="15" />
           </svg>
         ) : (
-          /* Speaker on */
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
