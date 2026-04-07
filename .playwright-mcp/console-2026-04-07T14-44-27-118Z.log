@@ -1,0 +1,3 @@
+[    1874ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://duemate-opal.vercel.app/sign-in?_rsc=1r34m:0
+[    2045ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://duemate-opal.vercel.app/sign-up?_rsc=1r34m:0
+[  119031ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://duemate-opal.vercel.app/sign-up?_rsc=1r34m:0

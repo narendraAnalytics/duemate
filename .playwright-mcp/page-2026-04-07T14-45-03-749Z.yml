@@ -1,0 +1,42 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - navigation [ref=e4]:
+      - link "DueMate" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "DueMate" [ref=e6]
+      - list [ref=e7]:
+        - listitem [ref=e8]:
+          - link "Features" [ref=e9] [cursor=pointer]:
+            - /url: "#features"
+        - listitem [ref=e10]:
+          - link "How It Works" [ref=e11] [cursor=pointer]:
+            - /url: "#how-it-works"
+        - listitem [ref=e12]:
+          - link "Pricing" [ref=e13] [cursor=pointer]:
+            - /url: "#pricing"
+      - generic [ref=e14]:
+        - link "Sign In" [ref=e15] [cursor=pointer]:
+          - /url: /sign-in
+        - link "Get Started" [ref=e16] [cursor=pointer]:
+          - /url: /sign-up
+    - generic [ref=e17]:
+      - generic [ref=e22]:
+        - paragraph [ref=e23]: AI-Powered Payment Reminders
+        - generic [ref=e24]:
+          - heading "GET PAID." [level=1] [ref=e26]
+          - heading "ON TIME." [level=1] [ref=e28]
+          - heading "EVERY TIME." [level=1] [ref=e30]
+        - generic [ref=e31]:
+          - paragraph [ref=e32]: Upload invoices, let AI extract data, then sit back as smart reminders go out via email & WhatsApp — automatically.
+          - generic [ref=e33]:
+            - link "Start Free →" [ref=e34] [cursor=pointer]:
+              - /url: /sign-up
+              - generic [ref=e35]: Start Free
+              - generic [ref=e36]: →
+            - link "See how it works" [ref=e38] [cursor=pointer]:
+              - /url: "#features"
+      - button "Mute video" [active] [ref=e49]:
+        - img [ref=e40]
+        - generic [ref=e44]: Sound On
+      - generic [ref=e47]: Scroll to explore
+  - alert [ref=e48]
