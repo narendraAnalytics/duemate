@@ -74,7 +74,7 @@ Fluid type scale in `:root` via `clamp()` — `--text-xs` through `--text-hero`.
 `.db-select` class in `globals.css` — use for all `<select>` elements in the dashboard (avoids inline styles, includes focus state and option background).
 
 ## Auth — CRITICAL
-- `src/middleware.ts` runs `clerkMiddleware()` — must be inside `src/` (not project root) when using `src/` directory layout. All routes are public by default.
+- `src/proxy.ts` runs `clerkMiddleware()` — must be inside `src/` (not project root) when using `src/` directory layout. All routes are public by default.
 - `<ClerkProvider>` wraps children inside `<body>` in `src/app/layout.tsx`
 - Use `<Show when="signed-in">` / `<Show when="signed-out">` from `@clerk/nextjs` — **NOT** deprecated `<SignedIn>` / `<SignedOut>`
 - Use `useUser()` hook in client components to read auth state
@@ -155,7 +155,7 @@ All routes call `getOrCreateUser()` first, validate input with Zod, return `{ su
 ## Key File Paths
 | File | Purpose |
 |---|---|
-| `src/middleware.ts` | Clerk middleware — must be inside `src/` when using `src/` directory layout |
+| `src/proxy.ts` | Clerk middleware — must be inside `src/` when using `src/` directory layout |
 | `drizzle.config.ts` | Drizzle Kit config (uses `DATABASE_URL_UNPOOLED`) |
 | `src/lib/schema.ts` | All 7 Drizzle table schemas + exported types |
 | `src/lib/db.ts` | Neon HTTP driver → Drizzle client |
