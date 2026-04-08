@@ -3,6 +3,7 @@ import {
   text,
   uuid,
   numeric,
+  integer,
   timestamp,
   boolean,
   jsonb,
@@ -76,6 +77,7 @@ export const products = pgTable("products", {
   description: text("description"),
   rate: numeric("rate", { precision: 10, scale: 2 }).notNull(),
   unit: text("unit").default("pcs"), // e.g. kg, pcs, litre, box
+  quantity: integer("quantity").default(0).notNull(), // current stock count
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

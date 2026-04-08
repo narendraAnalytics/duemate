@@ -37,7 +37,7 @@ body {
   color: var(--color-bg);
 }
 
-/* Dashboard form select */
+/* Dashboard form select — dark theme (landing) */
 .db-select {
   background: rgba(13, 20, 38, 0.8);
   border: 1px solid rgba(129, 140, 248, 0.2);
@@ -58,4 +58,90 @@ body {
 
 .db-select option {
   background: #0d1426;
+}
+
+/* Dashboard form select — light theme */
+.db-select-light {
+  background: #FAF8F4;
+  border: 1.5px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #1C1B2E;
+  font-family: var(--font-body);
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+  appearance: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.db-select-light:focus {
+  border-color: #5B5EF4;
+  box-shadow: 0 0 0 3px rgba(91, 94, 244, 0.1);
+}
+
+.db-select-light option {
+  background: #ffffff;
+  color: #1C1B2E;
+}
+
+/* Product card inline edit inputs */
+.db-edit-input {
+  width: 100%;
+  background: #FAF8F4;
+  border: 1.5px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: #1C1B2E;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.db-edit-input:focus {
+  border-color: #5B5EF4;
+}
+
+/* Quantity edit input — amber highlight */
+.db-edit-input-qty {
+  width: 100%;
+  background: rgba(217, 119, 6, 0.06);
+  border: 1.5px solid rgba(217, 119, 6, 0.3);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  color: #D97706;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.db-edit-input-qty:focus {
+  border-color: #D97706;
+}
+
+/* Edit mode field labels */
+.db-edit-label {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  color: #9CA3AF;
+}
+
+.db-edit-label-qty {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  color: #D97706;
 }

@@ -10,6 +10,7 @@ const createSchema = z.object({
   description: z.string().optional(),
   rate: z.number().positive("Rate must be positive"),
   unit: z.string().optional().default("pcs"),
+  quantity: z.number().int().min(0).default(0),
 });
 
 export async function GET() {
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, description, rate, unit } = parsed.data;
+    const { name, description, rate, unit, quantity } = parsed.data;
     const [created] = await db
       .insert(products)
       .values({
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
         description: description || null,
         rate: rate.toString(),
         unit: unit || "pcs",
+        quantity,
       })
       .returning();
 

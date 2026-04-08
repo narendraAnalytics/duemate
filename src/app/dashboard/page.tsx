@@ -21,12 +21,34 @@ type Product = {
   description: string | null;
   rate: string;
   unit: string | null;
+  quantity: number;
   createdAt: string;
 };
 
 type Tab = "customers" | "products" | "sales";
 
-// ─── Small reusable components ────────────────────────────────────────────────
+// ─── Design tokens (light theme for dashboard) ────────────────────────────────
+
+const D = {
+  bg: "#F4F0E8",
+  surface: "#FFFFFF",
+  surfaceAlt: "#FAF8F4",
+  border: "rgba(129,140,248,0.18)",
+  borderFaint: "rgba(0,0,0,0.06)",
+  primary: "#5B5EF4",
+  primaryLight: "rgba(91,94,244,0.08)",
+  amber: "#D97706",
+  amberLight: "rgba(217,119,6,0.1)",
+  text: "#1C1B2E",
+  textMid: "#6B7280",
+  textFaint: "#9CA3AF",
+  shadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06)",
+  shadowHover: "0 4px 24px rgba(0,0,0,0.1)",
+  radius: "14px",
+  radiusSm: "8px",
+};
+
+// ─── Input Field ──────────────────────────────────────────────────────────────
 
 function InputField({
   label,
@@ -45,20 +67,25 @@ function InputField({
   placeholder?: string;
   required?: boolean;
 }) {
+  const [focused, setFocused] = useState(false);
   return (
-    <div className="flex flex-col gap-1">
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       <label
         htmlFor={name}
         style={{
-          fontSize: "var(--text-xs)",
-          color: "var(--color-primary)",
+          fontSize: "11px",
           fontFamily: "var(--font-body)",
-          letterSpacing: "0.08em",
+          fontWeight: 600,
+          color: focused ? D.primary : D.textMid,
+          letterSpacing: "0.09em",
           textTransform: "uppercase",
+          transition: "color 0.2s",
         }}
       >
         {label}
-        {required && <span style={{ color: "var(--color-secondary)" }}> *</span>}
+        {required && (
+          <span style={{ color: D.amber, marginLeft: "3px" }}>*</span>
+        )}
       </label>
       <input
         id={name}
@@ -66,58 +93,83 @@ function InputField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         style={{
-          background: "rgba(13,20,38,0.8)",
-          border: "1px solid rgba(129,140,248,0.2)",
-          borderRadius: "8px",
-          padding: "10px 14px",
-          color: "var(--color-text)",
+          background: focused ? D.surface : D.surfaceAlt,
+          border: `1.5px solid ${focused ? D.primary : D.borderFaint}`,
+          borderRadius: D.radiusSm,
+          padding: "11px 14px",
+          color: D.text,
           fontFamily: "var(--font-body)",
-          fontSize: "var(--text-sm)",
+          fontSize: "14px",
           outline: "none",
-          transition: "border-color 0.2s",
+          transition: "all 0.2s",
           width: "100%",
-        }}
-        onFocus={(e) => {
-          e.target.style.borderColor = "var(--color-primary)";
-        }}
-        onBlur={(e) => {
-          e.target.style.borderColor = "rgba(129,140,248,0.2)";
+          boxShadow: focused ? `0 0 0 3px rgba(91,94,244,0.1)` : "none",
         }}
       />
     </div>
   );
 }
 
-function SubmitButton({
-  loading,
-  label,
-}: {
-  loading: boolean;
-  label: string;
-}) {
+// ─── Submit Button ────────────────────────────────────────────────────────────
+
+function SubmitButton({ loading, label }: { loading: boolean; label: string }) {
   return (
     <button
       type="submit"
       disabled={loading}
       style={{
-        background: loading
-          ? "rgba(129,140,248,0.3)"
-          : "linear-gradient(135deg, #818CF8 0%, #6366f1 100%)",
-        color: loading ? "rgba(196,207,238,0.5)" : "#fff",
+        background: loading ? "#C7C9FB" : D.primary,
+        color: "#fff",
         border: "none",
-        borderRadius: "8px",
-        padding: "11px 28px",
+        borderRadius: D.radiusSm,
+        padding: "11px 32px",
         fontFamily: "var(--font-body)",
-        fontSize: "var(--text-sm)",
-        fontWeight: 600,
+        fontSize: "13px",
+        fontWeight: 700,
         cursor: loading ? "not-allowed" : "pointer",
+        letterSpacing: "0.06em",
         transition: "all 0.2s",
-        letterSpacing: "0.04em",
+        boxShadow: loading ? "none" : "0 2px 8px rgba(91,94,244,0.35)",
       }}
     >
       {loading ? "Saving…" : label}
     </button>
+  );
+}
+
+// ─── Section Heading ──────────────────────────────────────────────────────────
+
+function SectionHeading({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div style={{ marginBottom: "28px" }}>
+      <h2
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: "clamp(1.6rem, 2vw, 2.2rem)",
+          color: D.text,
+          letterSpacing: "0.04em",
+          lineHeight: 1,
+          marginBottom: sub ? "6px" : 0,
+        }}
+      >
+        {title}
+      </h2>
+      {sub && (
+        <p
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontStyle: "italic",
+            fontSize: "14px",
+            color: D.textFaint,
+          }}
+        >
+          {sub}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -129,6 +181,7 @@ function CustomersSection() {
   const [fetching, setFetching] = useState(true);
   const [form, setForm] = useState({ name: "", email: "", shopName: "" });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   const fetchList = useCallback(async () => {
     setFetching(true);
@@ -156,6 +209,8 @@ function CustomersSection() {
     setLoading(false);
     if (json.success) {
       setForm({ name: "", email: "", shopName: "" });
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
       fetchList();
     } else {
       setError(typeof json.error === "string" ? json.error : "Failed to save.");
@@ -163,29 +218,30 @@ function CustomersSection() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-      {/* Add form */}
+    <div style={{ display: "flex", flexDirection: "column", gap: "36px" }}>
+      <SectionHeading title="Add Buyer" sub="Save your customer details for quick invoice creation" />
+
+      {/* Form card */}
       <div
         style={{
-          background: "var(--color-surface)",
-          border: "1px solid rgba(129,140,248,0.12)",
-          borderRadius: "16px",
-          padding: "28px",
+          background: D.surface,
+          borderRadius: D.radius,
+          padding: "32px",
+          boxShadow: D.shadow,
+          border: `1px solid ${D.borderFaint}`,
         }}
       >
-        <h3
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "var(--text-xl)",
-            color: "var(--color-text)",
-            marginBottom: "20px",
-            letterSpacing: "0.04em",
-          }}
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "20px" }}
         >
-          Add Buyer
-        </h3>
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "20px",
+            }}
+          >
             <InputField
               label="Buyer Name"
               name="name"
@@ -195,7 +251,7 @@ function CustomersSection() {
               required
             />
             <InputField
-              label="Shop Name"
+              label="Shop / Business Name"
               name="shopName"
               value={form.shopName}
               onChange={(v) => setForm((f) => ({ ...f, shopName: v }))}
@@ -203,74 +259,200 @@ function CustomersSection() {
             />
           </div>
           <InputField
-            label="Email"
+            label="Email Address"
             name="email"
             type="email"
             value={form.email}
             onChange={(v) => setForm((f) => ({ ...f, email: v }))}
             placeholder="buyer@example.com"
           />
-          {error && (
-            <p style={{ color: "#f87171", fontSize: "var(--text-xs)", fontFamily: "var(--font-body)" }}>
-              {error}
-            </p>
-          )}
-          <div>
-            <SubmitButton loading={loading} label="Save Buyer" />
+
+          <div style={{ display: "flex", alignItems: "center", gap: "16px", paddingTop: "4px" }}>
+            <SubmitButton loading={loading} label="Save Buyer →" />
+            {success && (
+              <motion.span
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                style={{
+                  fontFamily: "var(--font-serif)",
+                  fontStyle: "italic",
+                  fontSize: "14px",
+                  color: "#16A34A",
+                }}
+              >
+                Buyer saved!
+              </motion.span>
+            )}
+            {error && (
+              <span
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "13px",
+                  color: "#DC2626",
+                }}
+              >
+                {error}
+              </span>
+            )}
           </div>
         </form>
       </div>
 
-      {/* List */}
+      {/* Buyers list */}
       <div>
-        <h3
+        <div
           style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "var(--text-lg)",
-            color: "rgba(196,207,238,0.5)",
+            display: "flex",
+            alignItems: "baseline",
+            gap: "10px",
             marginBottom: "16px",
-            letterSpacing: "0.04em",
           }}
         >
-          {fetching ? "Loading…" : `${list.length} Buyer${list.length !== 1 ? "s" : ""}`}
-        </h3>
+          <h3
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "1.4rem",
+              color: D.text,
+              letterSpacing: "0.03em",
+            }}
+          >
+            {fetching ? "Loading…" : `${list.length} Buyer${list.length !== 1 ? "s" : ""}`}
+          </h3>
+          <span
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontStyle: "italic",
+              fontSize: "13px",
+              color: D.textFaint,
+            }}
+          >
+            registered
+          </span>
+        </div>
+
         {!fetching && list.length === 0 ? (
-          <p style={{ color: "rgba(196,207,238,0.3)", fontFamily: "var(--font-body)", fontSize: "var(--text-sm)" }}>
-            No buyers yet. Add one above.
-          </p>
+          <div
+            style={{
+              background: D.surfaceAlt,
+              border: `1.5px dashed ${D.border}`,
+              borderRadius: D.radius,
+              padding: "40px",
+              textAlign: "center",
+            }}
+          >
+            <p
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontStyle: "italic",
+                color: D.textFaint,
+                fontSize: "15px",
+              }}
+            >
+              No buyers yet — add your first one above.
+            </p>
+          </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {list.map((c) => (
+          <div
+            style={{
+              background: D.surface,
+              borderRadius: D.radius,
+              boxShadow: D.shadow,
+              border: `1px solid ${D.borderFaint}`,
+              overflow: "hidden",
+            }}
+          >
+            {/* Table header */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                padding: "12px 24px",
+                background: D.surfaceAlt,
+                borderBottom: `1px solid ${D.borderFaint}`,
+              }}
+            >
+              {["Buyer", "Email", "Added"].map((h) => (
+                <span
+                  key={h}
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: D.textFaint,
+                    letterSpacing: "0.09em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {h}
+                </span>
+              ))}
+            </div>
+
+            {list.map((c, i) => (
               <motion.div
                 key={c.id}
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
                 style={{
-                  background: "var(--color-surface)",
-                  border: "1px solid rgba(129,140,248,0.08)",
-                  borderRadius: "12px",
-                  padding: "16px 20px",
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: "8px",
+                  padding: "16px 24px",
                   alignItems: "center",
+                  borderBottom:
+                    i < list.length - 1
+                      ? `1px solid ${D.borderFaint}`
+                      : "none",
+                  background:
+                    i % 2 === 0 ? D.surface : "rgba(244,240,232,0.4)",
                 }}
               >
                 <div>
-                  <p style={{ fontFamily: "var(--font-body)", fontWeight: 600, color: "var(--color-text)", fontSize: "var(--text-sm)" }}>
+                  <p
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      fontWeight: 600,
+                      color: D.text,
+                      fontSize: "14px",
+                    }}
+                  >
                     {c.name}
                   </p>
                   {c.shopName && (
-                    <p style={{ fontFamily: "var(--font-body)", fontSize: "var(--text-xs)", color: "var(--color-secondary)", marginTop: "2px" }}>
+                    <p
+                      style={{
+                        fontFamily: "var(--font-body)",
+                        fontSize: "12px",
+                        color: D.amber,
+                        marginTop: "2px",
+                        fontWeight: 500,
+                      }}
+                    >
                       {c.shopName}
                     </p>
                   )}
                 </div>
-                <p style={{ fontFamily: "var(--font-body)", fontSize: "var(--text-xs)", color: "rgba(196,207,238,0.5)" }}>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "13px",
+                    color: D.textMid,
+                  }}
+                >
                   {c.email || "—"}
                 </p>
-                <p style={{ fontFamily: "var(--font-body)", fontSize: "var(--text-xs)", color: "rgba(196,207,238,0.3)", textAlign: "right" }}>
-                  {new Date(c.createdAt).toLocaleDateString("en-IN")}
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "12px",
+                    color: D.textFaint,
+                  }}
+                >
+                  {new Date(c.createdAt).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
                 </p>
               </motion.div>
             ))}
@@ -281,14 +463,284 @@ function CustomersSection() {
   );
 }
 
+// ─── Product Card (with inline edit) ─────────────────────────────────────────
+
+function StockBadge({ quantity, unit }: { quantity: number; unit: string | null }) {
+  const isOut = quantity === 0;
+  const isLow = !isOut && quantity <= 5;
+  const color = isOut ? "#DC2626" : isLow ? D.amber : "#16A34A";
+  const bg = isOut ? "rgba(220,38,38,0.08)" : isLow ? "rgba(217,119,6,0.1)" : "rgba(22,163,74,0.08)";
+  const border = isOut ? "rgba(220,38,38,0.2)" : isLow ? "rgba(217,119,6,0.25)" : "rgba(22,163,74,0.2)";
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: bg, border: `1px solid ${border}`, borderRadius: "20px", padding: "3px 10px" }}>
+      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: color, flexShrink: 0 }} />
+      <span style={{ fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 600, color }}>
+        {isOut ? "Out of stock" : `${quantity} ${unit ?? "pcs"} in stock`}
+      </span>
+    </div>
+  );
+}
+
+function ProductCard({
+  product,
+  index,
+  onUpdated,
+}: {
+  product: Product;
+  index: number;
+  onUpdated: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editErr, setEditErr] = useState("");
+  const [draft, setDraft] = useState({
+    name: product.name,
+    description: product.description ?? "",
+    rate: product.rate,
+    unit: product.unit ?? "pcs",
+    quantity: String(product.quantity),
+  });
+
+  const UNITS = ["pcs","kg","g","litre","ml","box","dozen","metre","bag","ton"];
+
+  async function handleSave() {
+    if (!draft.name.trim()) return setEditErr("Name required.");
+    if (!draft.rate || Number(draft.rate) <= 0) return setEditErr("Enter a valid rate.");
+    if (isNaN(Number(draft.quantity)) || Number(draft.quantity) < 0) return setEditErr("Quantity must be 0 or more.");
+    setEditErr("");
+    setSaving(true);
+    const res = await fetch(`/api/products/${product.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: draft.name,
+        description: draft.description || null,
+        rate: Number(draft.rate),
+        unit: draft.unit,
+        quantity: Number(draft.quantity),
+      }),
+    });
+    const json = await res.json();
+    setSaving(false);
+    if (json.success) {
+      setEditing(false);
+      onUpdated();
+    } else {
+      setEditErr(typeof json.error === "string" ? json.error : "Update failed.");
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.06 }}
+      style={{
+        background: D.surface,
+        borderRadius: D.radius,
+        boxShadow: editing ? D.shadowHover : D.shadow,
+        border: `1px solid ${editing ? D.border : D.borderFaint}`,
+        overflow: "hidden",
+        position: "relative",
+        transition: "box-shadow 0.2s, border-color 0.2s",
+      }}
+    >
+      {/* Amber top stripe */}
+      <div style={{ height: "3px", background: `linear-gradient(90deg, ${D.amber}, #F59E0B)` }} />
+
+      <AnimatePresence mode="wait">
+        {!editing ? (
+          /* ── View mode ── */
+          <motion.div
+            key="view"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ padding: "18px 20px" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
+              <p style={{ fontFamily: "var(--font-body)", fontWeight: 700, color: D.text, fontSize: "14px" }}>
+                {product.name}
+              </p>
+              <button
+                type="button"
+                onClick={() => { setDraft({ name: product.name, description: product.description ?? "", rate: product.rate, unit: product.unit ?? "pcs", quantity: String(product.quantity) }); setEditing(true); setEditErr(""); }}
+                style={{
+                  background: D.primaryLight,
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "3px 10px",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-body)",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: D.primary,
+                  letterSpacing: "0.04em",
+                  flexShrink: 0,
+                  marginLeft: "8px",
+                }}
+              >
+                Edit
+              </button>
+            </div>
+            {product.description && (
+              <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: D.textFaint, marginBottom: "12px", lineHeight: 1.4 }}>
+                {product.description}
+              </p>
+            )}
+            <div style={{ marginTop: product.description ? 0 : "12px", display: "flex", alignItems: "baseline", gap: "3px", marginBottom: "10px" }}>
+              <span style={{ fontFamily: "var(--font-display)", fontSize: "clamp(1.5rem,2.5vw,2rem)", color: D.amber, letterSpacing: "0.02em", lineHeight: 1 }}>
+                ₹{Number(product.rate).toLocaleString("en-IN")}
+              </span>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: "11px", color: D.textFaint, fontWeight: 500 }}>
+                /{product.unit}
+              </span>
+            </div>
+            <StockBadge quantity={product.quantity} unit={product.unit} />
+          </motion.div>
+        ) : (
+          /* ── Edit mode ── */
+          <motion.div
+            key="edit"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: "12px" }}
+          >
+            <p style={{ fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 700, color: D.primary, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>
+              Editing
+            </p>
+
+            {/* Name */}
+            <div>
+              <label htmlFor={`edit-name-${product.id}`} className="db-edit-label">Name</label>
+              <input
+                id={`edit-name-${product.id}`}
+                className="db-edit-input"
+                value={draft.name}
+                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                placeholder="Product name"
+              />
+            </div>
+
+            {/* Rate + Qty */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div>
+                <label htmlFor={`edit-rate-${product.id}`} className="db-edit-label">Rate (₹)</label>
+                <input
+                  id={`edit-rate-${product.id}`}
+                  className="db-edit-input"
+                  type="number"
+                  value={draft.rate}
+                  onChange={(e) => setDraft((d) => ({ ...d, rate: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label htmlFor={`edit-qty-${product.id}`} className="db-edit-label-qty">Stock Qty</label>
+                <input
+                  id={`edit-qty-${product.id}`}
+                  className="db-edit-input-qty"
+                  type="number"
+                  value={draft.quantity}
+                  onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/* Unit */}
+            <div>
+              <label htmlFor={`unit-${product.id}`} className="db-edit-label">Unit</label>
+              <select
+                id={`unit-${product.id}`}
+                className="db-select-light"
+                value={draft.unit}
+                onChange={(e) => setDraft((d) => ({ ...d, unit: e.target.value }))}
+              >
+                {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label htmlFor={`edit-desc-${product.id}`} className="db-edit-label">Description</label>
+              <input
+                id={`edit-desc-${product.id}`}
+                className="db-edit-input"
+                value={draft.description}
+                onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+
+            {editErr && (
+              <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: "#DC2626" }}>{editErr}</p>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: "8px", paddingTop: "4px" }}>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                style={{
+                  flex: 1,
+                  background: saving ? "#C7C9FB" : D.primary,
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "7px",
+                  padding: "8px",
+                  fontFamily: "var(--font-body)",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: saving ? "not-allowed" : "pointer",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEditing(false); setEditErr(""); }}
+                style={{
+                  flex: 1,
+                  background: D.surfaceAlt,
+                  color: D.textMid,
+                  border: `1px solid ${D.borderFaint}`,
+                  borderRadius: "7px",
+                  padding: "8px",
+                  fontFamily: "var(--font-body)",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 // ─── Products Section ─────────────────────────────────────────────────────────
 
 function ProductsSection() {
   const [list, setList] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [form, setForm] = useState({ name: "", description: "", rate: "", unit: "pcs" });
+  const [form, setForm] = useState({
+    name: "",
+    description: "",
+    rate: "",
+    unit: "pcs",
+    quantity: "",
+  });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   const fetchList = useCallback(async () => {
     setFetching(true);
@@ -307,202 +759,228 @@ function ProductsSection() {
     if (!form.name.trim()) return setError("Product name is required.");
     if (!form.rate || isNaN(Number(form.rate)) || Number(form.rate) <= 0)
       return setError("Enter a valid rate.");
+    if (form.quantity && (isNaN(Number(form.quantity)) || Number(form.quantity) < 0))
+      return setError("Quantity must be 0 or more.");
     setError("");
     setLoading(true);
     const res = await fetch("/api/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, rate: Number(form.rate) }),
+      body: JSON.stringify({
+        ...form,
+        rate: Number(form.rate),
+        quantity: form.quantity ? Number(form.quantity) : 0,
+      }),
     });
     const json = await res.json();
     setLoading(false);
     if (json.success) {
-      setForm({ name: "", description: "", rate: "", unit: "pcs" });
+      setForm({ name: "", description: "", rate: "", unit: "pcs", quantity: "" });
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
       fetchList();
     } else {
       setError(typeof json.error === "string" ? json.error : "Failed to save.");
     }
   }
 
-  const UNITS = ["pcs", "kg", "g", "litre", "ml", "box", "dozen", "metre", "bag", "ton"];
+  const UNITS = [
+    "pcs","kg","g","litre","ml","box","dozen","metre","bag","ton",
+  ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-      {/* Add form */}
+    <div style={{ display: "flex", flexDirection: "column", gap: "36px" }}>
+      <SectionHeading
+        title="Add Product"
+        sub="Define the goods or materials you sell with their rates"
+      />
+
+      {/* Form card */}
       <div
         style={{
-          background: "var(--color-surface)",
-          border: "1px solid rgba(129,140,248,0.12)",
-          borderRadius: "16px",
-          padding: "28px",
+          background: D.surface,
+          borderRadius: D.radius,
+          padding: "32px",
+          boxShadow: D.shadow,
+          border: `1px solid ${D.borderFaint}`,
         }}
       >
-        <h3
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "var(--text-xl)",
-            color: "var(--color-text)",
-            marginBottom: "20px",
-            letterSpacing: "0.04em",
-          }}
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "20px" }}
         >
-          Add Product / Good
-        </h3>
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2fr 1fr 1fr 1fr",
+              gap: "20px",
+            }}
+          >
             <InputField
               label="Product Name"
               name="pname"
               value={form.name}
               onChange={(v) => setForm((f) => ({ ...f, name: v }))}
-              placeholder="e.g. Basmati Rice"
+              placeholder="e.g. Mens Shorts"
               required
             />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              <InputField
-                label="Rate (₹)"
-                name="rate"
-                type="number"
-                value={form.rate}
-                onChange={(v) => setForm((f) => ({ ...f, rate: v }))}
-                placeholder="50.00"
-                required
-              />
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="unit"
-                  style={{
-                    fontSize: "var(--text-xs)",
-                    color: "var(--color-primary)",
-                    fontFamily: "var(--font-body)",
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Unit
-                </label>
-                <select
-                  id="unit"
-                  className="db-select"
-                  value={form.unit}
-                  onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-                >
-                  {UNITS.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <InputField
+              label="Rate (₹)"
+              name="rate"
+              type="number"
+              value={form.rate}
+              onChange={(v) => setForm((f) => ({ ...f, rate: v }))}
+              placeholder="180.00"
+              required
+            />
+            <InputField
+              label="Stock Qty"
+              name="quantity"
+              type="number"
+              value={form.quantity}
+              onChange={(v) => setForm((f) => ({ ...f, quantity: v }))}
+              placeholder="0"
+            />
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label
+                htmlFor="unit"
+                style={{
+                  fontSize: "11px",
+                  fontFamily: "var(--font-body)",
+                  fontWeight: 600,
+                  color: D.textMid,
+                  letterSpacing: "0.09em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Unit
+              </label>
+              <select
+                id="unit"
+                className="db-select-light"
+                value={form.unit}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, unit: e.target.value }))
+                }
+              >
+                {UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
+
           <InputField
             label="Description (optional)"
             name="desc"
             value={form.description}
             onChange={(v) => setForm((f) => ({ ...f, description: v }))}
-            placeholder="Short description of the product"
+            placeholder="Short note about this product"
           />
-          {error && (
-            <p style={{ color: "#f87171", fontSize: "var(--text-xs)", fontFamily: "var(--font-body)" }}>
-              {error}
-            </p>
-          )}
-          <div>
-            <SubmitButton loading={loading} label="Add Product" />
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+              paddingTop: "4px",
+            }}
+          >
+            <SubmitButton loading={loading} label="Add Product →" />
+            {success && (
+              <motion.span
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                style={{
+                  fontFamily: "var(--font-serif)",
+                  fontStyle: "italic",
+                  fontSize: "14px",
+                  color: "#16A34A",
+                }}
+              >
+                Product added!
+              </motion.span>
+            )}
+            {error && (
+              <span
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "13px",
+                  color: "#DC2626",
+                }}
+              >
+                {error}
+              </span>
+            )}
           </div>
         </form>
       </div>
 
-      {/* Product grid */}
+      {/* Product cards */}
       <div>
-        <h3
+        <div
           style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "var(--text-lg)",
-            color: "rgba(196,207,238,0.5)",
+            display: "flex",
+            alignItems: "baseline",
+            gap: "10px",
             marginBottom: "16px",
-            letterSpacing: "0.04em",
           }}
         >
-          {fetching ? "Loading…" : `${list.length} Product${list.length !== 1 ? "s" : ""}`}
-        </h3>
+          <h3
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "1.4rem",
+              color: D.text,
+              letterSpacing: "0.03em",
+            }}
+          >
+            {fetching ? "Loading…" : `${list.length} Product${list.length !== 1 ? "s" : ""}`}
+          </h3>
+          <span
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontStyle: "italic",
+              fontSize: "13px",
+              color: D.textFaint,
+            }}
+          >
+            in your catalogue
+          </span>
+        </div>
+
         {!fetching && list.length === 0 ? (
-          <p style={{ color: "rgba(196,207,238,0.3)", fontFamily: "var(--font-body)", fontSize: "var(--text-sm)" }}>
-            No products yet. Add one above.
-          </p>
+          <div
+            style={{
+              background: D.surfaceAlt,
+              border: `1.5px dashed ${D.border}`,
+              borderRadius: D.radius,
+              padding: "40px",
+              textAlign: "center",
+            }}
+          >
+            <p
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontStyle: "italic",
+                color: D.textFaint,
+                fontSize: "15px",
+              }}
+            >
+              No products yet — add your first one above.
+            </p>
+          </div>
         ) : (
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-              gap: "12px",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: "16px",
             }}
           >
-            {list.map((p) => (
-              <motion.div
-                key={p.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                style={{
-                  background: "var(--color-surface)",
-                  border: "1px solid rgba(129,140,248,0.1)",
-                  borderRadius: "14px",
-                  padding: "18px",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                {/* Subtle accent line */}
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: "2px",
-                    background: "linear-gradient(90deg, var(--color-secondary), transparent)",
-                  }}
-                />
-                <p
-                  style={{
-                    fontFamily: "var(--font-body)",
-                    fontWeight: 600,
-                    color: "var(--color-text)",
-                    fontSize: "var(--text-sm)",
-                    marginBottom: "6px",
-                  }}
-                >
-                  {p.name}
-                </p>
-                {p.description && (
-                  <p
-                    style={{
-                      fontFamily: "var(--font-body)",
-                      fontSize: "var(--text-xs)",
-                      color: "rgba(196,207,238,0.4)",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    {p.description}
-                  </p>
-                )}
-                <div style={{ display: "flex", alignItems: "baseline", gap: "4px", marginTop: "auto" }}>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-display)",
-                      fontSize: "var(--text-xl)",
-                      color: "var(--color-secondary)",
-                      letterSpacing: "0.02em",
-                    }}
-                  >
-                    ₹{Number(p.rate).toLocaleString("en-IN")}
-                  </span>
-                  <span style={{ fontFamily: "var(--font-body)", fontSize: "var(--text-xs)", color: "rgba(196,207,238,0.4)" }}>
-                    / {p.unit}
-                  </span>
-                </div>
-              </motion.div>
+            {list.map((p, i) => (
+              <ProductCard key={p.id} product={p} index={i} onUpdated={fetchList} />
             ))}
           </div>
         )}
@@ -511,7 +989,7 @@ function ProductsSection() {
   );
 }
 
-// ─── Sales Section (placeholder + product list preview) ───────────────────────
+// ─── Sales Section ────────────────────────────────────────────────────────────
 
 function SalesSection() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -527,26 +1005,45 @@ function SalesSection() {
   }, []);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-      {/* Coming soon card */}
+    <div style={{ display: "flex", flexDirection: "column", gap: "36px" }}>
+      <SectionHeading
+        title="Create Invoice"
+        sub="Coming soon — generate invoices and send automated reminders"
+      />
+
+      {/* Coming soon banner */}
       <div
         style={{
-          background: "var(--color-surface)",
-          border: "1px solid rgba(245,158,11,0.15)",
-          borderRadius: "16px",
-          padding: "36px 28px",
+          background: `linear-gradient(135deg, ${D.primaryLight} 0%, rgba(217,119,6,0.06) 100%)`,
+          border: `1.5px solid ${D.border}`,
+          borderRadius: D.radius,
+          padding: "48px 40px",
           textAlign: "center",
+          position: "relative",
+          overflow: "hidden",
         }}
       >
+        {/* Decorative circle */}
+        <div
+          style={{
+            position: "absolute",
+            top: "-60px",
+            right: "-60px",
+            width: "200px",
+            height: "200px",
+            borderRadius: "50%",
+            background: "rgba(91,94,244,0.05)",
+          }}
+        />
         <p
           style={{
             fontFamily: "var(--font-serif)",
             fontStyle: "italic",
-            fontSize: "var(--text-xs)",
-            color: "var(--color-secondary)",
-            letterSpacing: "0.12em",
+            fontSize: "12px",
+            color: D.primary,
+            letterSpacing: "0.16em",
             textTransform: "uppercase",
-            marginBottom: "12px",
+            marginBottom: "14px",
           }}
         >
           Coming Soon
@@ -554,103 +1051,170 @@ function SalesSection() {
         <h3
           style={{
             fontFamily: "var(--font-display)",
-            fontSize: "var(--text-2xl)",
-            color: "var(--color-text)",
+            fontSize: "clamp(1.8rem, 3vw, 2.8rem)",
+            color: D.text,
             letterSpacing: "0.04em",
-            marginBottom: "10px",
+            marginBottom: "12px",
+            lineHeight: 1,
           }}
         >
-          Create Invoice / Sale
+          Invoice & Reminder Engine
         </h3>
         <p
           style={{
             fontFamily: "var(--font-body)",
-            fontSize: "var(--text-sm)",
-            color: "rgba(196,207,238,0.45)",
+            fontSize: "14px",
+            color: D.textMid,
             maxWidth: "420px",
             margin: "0 auto",
+            lineHeight: 1.6,
           }}
         >
-          Pick a buyer, select products from your list, and generate an invoice with automated payment reminders.
+          Pick a buyer, select from your product list, set a due date — and let
+          DueMate handle the rest via email reminders automatically.
         </p>
       </div>
 
-      {/* Product rate reference */}
+      {/* Price list reference */}
       {!fetching && products.length > 0 && (
         <div>
-          <h3
+          <div
             style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "var(--text-lg)",
-              color: "rgba(196,207,238,0.5)",
+              display: "flex",
+              alignItems: "baseline",
+              gap: "10px",
               marginBottom: "16px",
-              letterSpacing: "0.04em",
             }}
           >
-            Your Price List
-          </h3>
-          <div style={{ overflowX: "auto" }}>
-            <table
+            <h3
               style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontFamily: "var(--font-body)",
-                fontSize: "var(--text-sm)",
+                fontFamily: "var(--font-display)",
+                fontSize: "1.4rem",
+                color: D.text,
+                letterSpacing: "0.03em",
               }}
             >
-              <thead>
-                <tr>
-                  {["Product", "Description", "Rate", "Unit"].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        textAlign: "left",
-                        padding: "10px 16px",
-                        fontSize: "var(--text-xs)",
-                        color: "var(--color-primary)",
-                        letterSpacing: "0.08em",
-                        textTransform: "uppercase",
-                        borderBottom: "1px solid rgba(129,140,248,0.12)",
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((p, i) => (
-                  <tr
-                    key={p.id}
-                    style={{
-                      background: i % 2 === 0 ? "transparent" : "rgba(13,20,38,0.4)",
-                    }}
-                  >
-                    <td style={{ padding: "12px 16px", color: "var(--color-text)", fontWeight: 500 }}>
-                      {p.name}
-                    </td>
-                    <td style={{ padding: "12px 16px", color: "rgba(196,207,238,0.45)" }}>
-                      {p.description || "—"}
-                    </td>
-                    <td
-                      style={{
-                        padding: "12px 16px",
-                        color: "var(--color-secondary)",
-                        fontWeight: 600,
-                        fontFamily: "var(--font-display)",
-                        fontSize: "var(--text-base)",
-                        letterSpacing: "0.02em",
-                      }}
-                    >
-                      ₹{Number(p.rate).toLocaleString("en-IN")}
-                    </td>
-                    <td style={{ padding: "12px 16px", color: "rgba(196,207,238,0.4)" }}>
-                      {p.unit}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              Price List
+            </h3>
+            <span
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontStyle: "italic",
+                fontSize: "13px",
+                color: D.textFaint,
+              }}
+            >
+              for reference while creating a sale
+            </span>
+          </div>
+
+          <div
+            style={{
+              background: D.surface,
+              borderRadius: D.radius,
+              boxShadow: D.shadow,
+              border: `1px solid ${D.borderFaint}`,
+              overflow: "hidden",
+            }}
+          >
+            {/* Header row */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr",
+                padding: "12px 24px",
+                background: D.surfaceAlt,
+                borderBottom: `1px solid ${D.borderFaint}`,
+              }}
+            >
+              {["Product", "Description", "Rate", "Unit", "Stock"].map((h) => (
+                <span
+                  key={h}
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: D.textFaint,
+                    letterSpacing: "0.09em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {h}
+                </span>
+              ))}
+            </div>
+
+            {products.map((p, i) => (
+              <div
+                key={p.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr",
+                  padding: "14px 24px",
+                  alignItems: "center",
+                  borderBottom:
+                    i < products.length - 1
+                      ? `1px solid ${D.borderFaint}`
+                      : "none",
+                  background:
+                    i % 2 === 0 ? D.surface : "rgba(244,240,232,0.5)",
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontWeight: 600,
+                    fontSize: "14px",
+                    color: D.text,
+                  }}
+                >
+                  {p.name}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "13px",
+                    color: D.textFaint,
+                  }}
+                >
+                  {p.description || "—"}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "1.1rem",
+                    color: D.amber,
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  ₹{Number(p.rate).toLocaleString("en-IN")}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "12px",
+                    color: D.textMid,
+                    fontWeight: 500,
+                  }}
+                >
+                  {p.unit}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: p.quantity === 0
+                      ? "#DC2626"
+                      : p.quantity <= 5
+                      ? D.amber
+                      : "#16A34A",
+                  }}
+                >
+                  {p.quantity === 0 ? "Out of stock" : p.quantity}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -680,7 +1244,7 @@ export default function DashboardPage() {
   return (
     <div
       style={{
-        background: "var(--color-bg)",
+        background: D.bg,
         height: "100svh",
         overflowY: "auto",
         fontFamily: "var(--font-body)",
@@ -689,19 +1253,21 @@ export default function DashboardPage() {
       {/* Header */}
       <header
         style={{
-          borderBottom: "1px solid rgba(129,140,248,0.1)",
-          padding: "20px 32px",
+          background: "rgba(255,255,255,0.92)",
+          backdropFilter: "blur(16px)",
+          borderBottom: `1px solid ${D.borderFaint}`,
+          padding: "0 40px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          height: "64px",
           position: "sticky",
           top: 0,
           zIndex: 10,
-          background: "rgba(7,10,18,0.92)",
-          backdropFilter: "blur(12px)",
+          boxShadow: "0 1px 0 rgba(0,0,0,0.05)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <button
             type="button"
             onClick={() => router.push("/")}
@@ -709,46 +1275,98 @@ export default function DashboardPage() {
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: "rgba(196,207,238,0.4)",
-              fontSize: "var(--text-xs)",
+              color: D.textFaint,
+              fontSize: "12px",
               fontFamily: "var(--font-body)",
-              letterSpacing: "0.08em",
+              fontWeight: 500,
+              letterSpacing: "0.06em",
               padding: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
             }}
           >
             ← Home
           </button>
-          <span style={{ color: "rgba(129,140,248,0.3)" }}>|</span>
-          <h1
+          <span
+            style={{
+              width: "1px",
+              height: "18px",
+              background: D.borderFaint,
+            }}
+          />
+          <span
             style={{
               fontFamily: "var(--font-display)",
-              fontSize: "var(--text-xl)",
-              color: "var(--color-text)",
+              fontSize: "1.4rem",
+              color: D.text,
               letterSpacing: "0.06em",
             }}
           >
+            DueMate
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontStyle: "italic",
+              fontSize: "13px",
+              color: D.textFaint,
+            }}
+          >
             Dashboard
-          </h1>
+          </span>
         </div>
-        <p
+
+        <div
           style={{
-            fontFamily: "var(--font-serif)",
-            fontStyle: "italic",
-            fontSize: "var(--text-sm)",
-            color: "var(--color-secondary)",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            background: D.surfaceAlt,
+            border: `1px solid ${D.borderFaint}`,
+            borderRadius: "40px",
+            padding: "6px 16px 6px 10px",
           }}
         >
-          {user.firstName ?? user.username ?? ""}
-        </p>
+          <div
+            style={{
+              width: "28px",
+              height: "28px",
+              borderRadius: "50%",
+              background: `linear-gradient(135deg, ${D.primary}, #818CF8)`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              fontFamily: "var(--font-body)",
+              fontWeight: 700,
+              fontSize: "12px",
+            }}
+          >
+            {(user.firstName ?? user.username ?? "U")[0].toUpperCase()}
+          </div>
+          <span
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontStyle: "italic",
+              fontSize: "14px",
+              color: D.text,
+            }}
+          >
+            {user.firstName ?? user.username ?? ""}
+          </span>
+        </div>
       </header>
 
-      {/* Tab nav */}
+      {/* Tab navigation */}
       <nav
         style={{
-          padding: "0 32px",
-          borderBottom: "1px solid rgba(129,140,248,0.08)",
+          background: "rgba(255,255,255,0.7)",
+          backdropFilter: "blur(8px)",
+          padding: "0 40px",
           display: "flex",
-          gap: "0",
+          gap: "4px",
+          borderBottom: `1px solid ${D.borderFaint}`,
         }}
       >
         {TABS.map((tab) => (
@@ -760,21 +1378,26 @@ export default function DashboardPage() {
               background: "none",
               border: "none",
               cursor: "pointer",
-              padding: "16px 24px",
+              padding: "0 20px",
+              height: "52px",
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              borderBottom: activeTab === tab.id ? "2px solid var(--color-primary)" : "2px solid transparent",
-              color: activeTab === tab.id ? "var(--color-text)" : "rgba(196,207,238,0.35)",
+              borderBottom:
+                activeTab === tab.id
+                  ? `2px solid ${D.primary}`
+                  : "2px solid transparent",
               transition: "all 0.2s",
+              position: "relative",
             }}
           >
             <span
               style={{
                 fontFamily: "var(--font-serif)",
                 fontStyle: "italic",
-                fontSize: "var(--text-xs)",
-                color: activeTab === tab.id ? "var(--color-secondary)" : "rgba(245,158,11,0.3)",
+                fontSize: "12px",
+                color:
+                  activeTab === tab.id ? D.amber : "rgba(217,119,6,0.35)",
                 letterSpacing: "0.04em",
               }}
             >
@@ -783,8 +1406,9 @@ export default function DashboardPage() {
             <span
               style={{
                 fontFamily: "var(--font-body)",
-                fontSize: "var(--text-sm)",
-                fontWeight: activeTab === tab.id ? 600 : 400,
+                fontSize: "13px",
+                fontWeight: activeTab === tab.id ? 700 : 400,
+                color: activeTab === tab.id ? D.text : D.textFaint,
                 letterSpacing: "0.04em",
               }}
             >
@@ -794,15 +1418,21 @@ export default function DashboardPage() {
         ))}
       </nav>
 
-      {/* Tab content */}
-      <main style={{ padding: "32px", maxWidth: "900px", margin: "0 auto" }}>
+      {/* Content */}
+      <main
+        style={{
+          padding: "40px",
+          maxWidth: "920px",
+          margin: "0 auto",
+        }}
+      >
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.18 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
           >
             {activeTab === "customers" && <CustomersSection />}
             {activeTab === "products" && <ProductsSection />}
