@@ -29,7 +29,10 @@ npx tsc --noEmit       # Type-check without building
 - Tailwind CSS v4 — `@import 'tailwindcss'` syntax, no config file needed
 - Framer Motion — page/component animations
 - GSAP + Lenis — feature slider sweeps, smooth scroll
-- Fonts: **Bebas Neue** (`--font-display`, `font-heading`) + **Space Grotesk** (`--font-body`, `font-sans`) via `next/font/google`
+- Fonts via `next/font/google`:
+  - **Bebas Neue** → `--font-display` / `font-heading` (headlines)
+  - **Space Grotesk** → `--font-body` / `font-sans` (body)
+  - **Cormorant Garamond** → `--font-serif` (menu numerals, italic accent text)
 - shadcn/ui — accessible pre-built components
 - Lucide React — icons
 - React Hook Form + Zod — type-safe form validation
@@ -37,20 +40,20 @@ npx tsc --noEmit       # Type-check without building
 
 ### Backend
 - Next.js 16 API Routes (App Router)
-- Clerk — auth, middleware route protection. **NO webhooks. NO CLERK_WEBHOOK_SECRET.**
+- Clerk v7 — auth + middleware. **NO webhooks. NO CLERK_WEBHOOK_SECRET.**
 - Drizzle ORM — type-safe schema-first SQL
 - Neon PostgreSQL — serverless, connection pooling
 
 ### AI + Automation
-- **Gemini 3.1 Flash-Lite Preview** — model string: `gemini-3.1-flash-lite-preview`. Native multimodal OCR for invoices. Do NOT use `gemini-2.0-flash` (shuts down June 1, 2026).
-- Inngest — 3 durable background functions
+- **Gemini 3.1 Flash-Lite Preview** — model string: `gemini-3.1-flash-lite-preview`. Do NOT use `gemini-2.0-flash` (shuts down June 1, 2026).
+- Inngest — 3 durable background functions (not yet implemented)
 - Resend + React Email — transactional email
 - Meta WhatsApp Cloud API (direct, no Twilio, no BSP markup)
 
 ### Infrastructure
 - Vercel — hosting + CI/CD
 - ImageKit — CDN + file storage for invoice PDFs/images
-- Cloudinary — video/image CDN for landing page assets
+- Cloudinary — video/image CDN for landing page assets (`res.cloudinary.com` whitelisted in `next.config.ts`)
 
 ## Implemented Design System (`src/app/globals.css`)
 
@@ -62,76 +65,85 @@ npx tsc --noEmit       # Type-check without building
 --color-text: #C4CFEE      /* cool lavender-white body text */
 ```
 
-Fluid type scale is defined in `:root` via CSS `clamp()` — `--text-xs` through `--text-hero`. Use these for headings instead of fixed `px` values.
+Fluid type scale in `:root` via `clamp()` — `--text-xs` through `--text-hero`. Use these for headings, not fixed `px` values.
 
 `html, body` have `overflow: hidden` — the landing page uses fullscreen sections (`height: 100svh`), not traditional scroll.
 
 ## Auth — CRITICAL
-- NO Clerk webhooks anywhere in the codebase
-- Call `getOrCreateUser()` from `lib/auth.ts` at the top of every authenticated API route
-- This lazily creates a DB user row on the user's first API call — no sync needed at sign-up
+- `middleware.ts` at project root runs `clerkMiddleware()` — all routes are public by default
+- `<ClerkProvider>` wraps children inside `<body>` in `src/app/layout.tsx`
+- Use `<Show when="signed-in">` / `<Show when="signed-out">` from `@clerk/nextjs` — **NOT** deprecated `<SignedIn>` / `<SignedOut>`
+- Use `useUser()` hook in client components to read auth state
+- Call `getOrCreateUser()` from `lib/auth.ts` at the top of every authenticated API route (lazy DB user creation on first API call — no webhook sync needed)
+- Sign-in page: `/sign-in` → `src/app/sign-in/[[...sign-in]]/page.tsx`
+- Sign-up page: `/sign-up` → `src/app/sign-up/[[...sign-up]]/page.tsx`
+- After sign-in/up both redirect to `/` (set via `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` and `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL`)
+
+## Navbar Architecture
+The navbar (`src/components/Navbar.tsx`) has no center nav links. Layout: **Logo (left) | Menu button + UserButton (right)**.
+
+- **Menu button**: "Menu" text with animated underline dash. On hover, runs a character-scramble animation (`useTextScramble` hook, 40ms interval, left-to-right reveal).
+- **Menu overlay**: Click opens a right-side slide-in panel (`min(420px, 88vw)`) with Framer Motion spring. Backdrop click or Escape closes it.
+- **Panel items**: Roman numerals I. II. III. in Cormorant Garamond italic (`--font-serif`), amber `--color-secondary`. Staggered entrance animation.
+- **Auth guard on nav links**: `handleNavClick()` checks `isSignedIn` — redirects to `/sign-in` if not authenticated, navigates to section anchor if authenticated.
+- **UserButton**: `<Show when="signed-in"><UserButton /></Show>` appears after the Menu button when signed in.
+
+## Landing Page — What's Built
+`src/app/page.tsx` assembles: `<CustomCursor />` + `<Navbar />` + `<HeroSection />`
+
+### HeroSection
+- Two Cloudinary-hosted `.webm` videos cycle with a page-flip transition (Framer Motion, skew sweep)
+- Active video plays once (triggers flip on `ended`); inactive video loops silently in background
+- Mute/unmute toggle button bottom-right
+- Animated headline stagger (Bebas Neue, `clamp` sizing)
+- When signed in: shows `"Welcome back, {username} —"` as an absolutely positioned overlay (Cormorant Garamond italic, amber) — uses `user.username ?? user.firstName ?? "there"` priority
+- "Start Free →" CTA links to `/sign-up`
+
+### CustomCursor
+`src/components/CustomCursor.tsx` — hides OS cursor globally, renders:
+- Outer ring: 36px, indigo `#818CF8` border, spring-lagged (`useSpring`)
+- Center dot: 5px, amber `#F59E0B` with glow, snaps precisely to mouse
 
 ## Gemini
 - Model: `gemini-3.1-flash-lite-preview`
 - Config: `responseMimeType: 'application/json'`, `temperature: 0.1`
-- File: `lib/gemini.ts` → `extractInvoiceData(fileBase64, mimeType)`
+- File: `lib/gemini.ts` → `extractInvoiceData(fileBase64, mimeType)` *(file not yet created)*
 
-## Inngest — 3 Functions
-1. **notifyOwner** — event: `invoice/created`, immediate confirmation email to the invoice owner
-2. **scheduleReminders** — event: `invoice/created`, uses `step.sleepUntil()` for up to 7 reminder slots (before_due_7d/3d/1d, on_due, after_due_3d/7d/14d)
+## Inngest — 3 Functions *(not yet implemented)*
+1. **notifyOwner** — event: `invoice/created`, immediate confirmation email to invoice owner
+2. **scheduleReminders** — event: `invoice/created`, `step.sleepUntil()` for up to 7 reminder slots
 3. **checkOverdue** — cron: `0 9 * * *`, marks pending past-due invoices as overdue
 
-Trigger flow: User submits invoice → DB insert → `inngest.send('invoice/created')` → [parallel] notifyOwner + scheduleReminders
-
-## Database — 6 Tables (Drizzle + Neon)
+## Database — 6 Tables (Drizzle + Neon) *(schema not yet created)*
 - **users** — Clerk userId as PK, email, name, businessName, plan (free/starter/pro), timezone
-- **customers** — userId FK, name, email, phone (E.164 format: +919876543210), company
+- **customers** — userId FK, name, email, phone (E.164), company
 - **invoices** — userId FK, customerId FK, invoiceNumber, amount, currency, dueDate, issueDate, description, status (pending/due_soon/overdue/paid/cancelled), fileUrl, extractedData (jsonb), aiConfidence, paidAt, notes
-- **reminders** — invoiceId FK, type, channel (email/whatsapp/both), scheduledAt, sentAt, status (pending/sent/failed/skipped), messageBody, error
+- **reminders** — invoiceId FK, type, channel (email/whatsapp/both), scheduledAt, sentAt, status, messageBody, error
 - **reminder_settings** — userId FK, 7 boolean timing toggles, emailEnabled, whatsappEnabled, customMessage, senderName
-- **notifications** — audit log, userId FK, reminderId FK, channel, recipient, subject, status (delivered/bounced/failed/read), externalId (Resend/Meta message ID), sentAt
+- **notifications** — audit log, userId FK, reminderId FK, channel, recipient, subject, status (delivered/bounced/failed/read), externalId, sentAt
 
 Run migrations: `npx drizzle-kit push` (use `DATABASE_URL_UNPOOLED`)
 
 ## WhatsApp
-- Provider: Meta WhatsApp Cloud API — **NOT Twilio, no BSP markup**
+- Provider: Meta WhatsApp Cloud API — **NOT Twilio**
 - Endpoint: `https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages`
 - Auth: Bearer `META_WHATSAPP_ACCESS_TOKEN`
-- Template: `payment_reminder` (UTILITY category — must be Meta-approved)
-- Code: `lib/whatsapp.ts` → `sendWhatsAppReminder()` — native fetch, no SDK
+- Template: `payment_reminder` (UTILITY — must be Meta-approved)
+- Code: `lib/whatsapp.ts` → `sendWhatsAppReminder()` *(file not yet created)*
 
 ## Key File Paths
 | File | Purpose |
 |---|---|
+| `middleware.ts` | Clerk middleware — must be at project root, named exactly this |
 | `src/app/globals.css` | Color system, fluid type scale, global resets |
-| `src/app/layout.tsx` | Font setup (Bebas Neue + Space Grotesk), metadata |
-| `src/app/page.tsx` | Public landing page — assembles Navbar + sections |
-| `src/components/Navbar.tsx` | Fixed transparent navbar, mobile hamburger drawer |
-| `src/components/HeroSection.tsx` | Fullscreen video hero, mute toggle, animated headline |
-| `lib/auth.ts` | `getOrCreateUser()` lazy sync |
-| `lib/gemini.ts` | Gemini 3.1 extraction |
-| `lib/email.ts` | Resend sender functions |
-| `lib/whatsapp.ts` | Meta WhatsApp sender |
-| `lib/db/schema.ts` | All 6 Drizzle table definitions |
-| `lib/db/index.ts` | Drizzle client |
-| `inngest/client.ts` | Inngest init |
-| `inngest/functions/notifyOwner.ts` | Owner confirmation |
-| `inngest/functions/scheduleReminders.ts` | Customer reminder scheduler |
-| `inngest/functions/checkOverdue.ts` | Daily overdue cron |
-| `app/api/invoices/route.ts` | POST: create invoice + fire inngest |
-| `app/api/invoices/extract/route.ts` | POST: Gemini AI extraction |
-| `app/api/inngest/route.ts` | Serve 3 Inngest functions |
-| `app/api/webhooks/whatsapp/route.ts` | Meta webhook handler |
-| `next.config.ts` | Image domains: `res.cloudinary.com` allowed |
-
-## Landing Page Architecture
-The public landing page (`src/app/page.tsx`) is built as fullscreen sections — no page scroll. Each section fills `100svh`. Navigation between sections will use JS-driven snap or button controls (not CSS scroll-snap, since `overflow: hidden` is on body).
-
-Components live in `src/components/` (not `src/app/components/`). Each major section is its own file:
-- `Navbar.tsx` — fixed, z-50, transparent (no background), floats over the hero
-- `HeroSection.tsx` — video background, Framer Motion headline stagger, mute toggle
-
-Future sections to build: Features, How It Works, Pricing, Footer.
+| `src/app/layout.tsx` | Fonts (3 families), ClerkProvider, metadata |
+| `src/app/page.tsx` | Landing page — CustomCursor + Navbar + HeroSection |
+| `src/app/sign-in/[[...sign-in]]/page.tsx` | Clerk SignIn component page |
+| `src/app/sign-up/[[...sign-up]]/page.tsx` | Clerk SignUp component page |
+| `src/components/Navbar.tsx` | Menu button, scramble animation, slide-in panel, auth guard |
+| `src/components/HeroSection.tsx` | Video hero, flip transition, welcome message |
+| `src/components/CustomCursor.tsx` | Spring-physics custom cursor |
+| `next.config.ts` | Cloudinary image domain whitelist |
 
 ## Coding Standards
 - TypeScript strict mode throughout
@@ -141,11 +153,12 @@ Future sections to build: Features, How It Works, Pricing, Footer.
 - Phone numbers always E.164 format (`+919876543210`)
 - Never expose secrets client-side
 - No `twilio` package anywhere
-- Buttons inside non-form contexts must have `type="button"`
+- Buttons outside `<form>` must have `type="button"`
 
 ## Environment Variables
-See `.env.local` (never commit). Key groups:
-- **Clerk**: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, sign-in/up/redirect URLs
+Stored in `.env` at project root (not `.env.local`). Must also be added to Vercel dashboard manually — this file is never committed.
+
+- **Clerk**: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`, `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`, `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
 - **Neon**: `DATABASE_URL` (pooled), `DATABASE_URL_UNPOOLED` (for drizzle-kit push)
 - **Gemini**: `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-3.1-flash-lite-preview`
 - **Resend**: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_FROM_NAME`

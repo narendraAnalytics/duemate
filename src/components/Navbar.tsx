@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: "#features",     label: "Features",     numeral: "I" },
   { href: "#how-it-works", label: "How It Works", numeral: "II" },
   { href: "#pricing",      label: "Pricing",      numeral: "III" },
+  { href: "/dashboard",    label: "Dashboard",    numeral: "IV" },
 ];
 
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
