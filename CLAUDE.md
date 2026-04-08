@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project
-AI-powered payment reminder SaaS. Users create or upload invoices, Gemini 3.1 Flash-Lite extracts data, Inngest schedules multi-channel reminders, Resend + Meta WhatsApp Cloud API deliver them automatically.
+AI-powered payment reminder SaaS. Users manage buyers and products, create invoices, Gemini 3.1 Flash-Lite extracts data, Inngest schedules multi-channel reminders, Resend + Meta WhatsApp Cloud API deliver them automatically.
 
 ## Design Skill
 For ALL frontend/UI work — landing page, dashboard, components, emails — use the skill at:
@@ -17,10 +17,12 @@ When examining UI references, use the Playwright MCP server to screenshot and in
 ```bash
 npm run dev            # Next.js dev server (Turbopack) — port 3000
 npx inngest-cli dev    # Inngest dev server — port 8288 (required locally)
-npx drizzle-kit push   # Push schema to Neon (use DATABASE_URL_UNPOOLED)
+npx drizzle-kit push   # Push schema changes to Neon (requires DATABASE_URL_UNPOOLED in .env)
 npx drizzle-kit studio # Visual DB browser
 npx tsc --noEmit       # Type-check without building
 ```
+
+> Schema migrations can also be applied via the **Neon MCP server** (`prepare_database_migration` → `complete_database_migration`) without needing `DATABASE_URL_UNPOOLED`.
 
 ## Stack
 
@@ -41,12 +43,12 @@ npx tsc --noEmit       # Type-check without building
 ### Backend
 - Next.js 16 API Routes (App Router)
 - Clerk v7 — auth + middleware. **NO webhooks. NO CLERK_WEBHOOK_SECRET.**
-- Drizzle ORM — type-safe schema-first SQL
-- Neon PostgreSQL — serverless, connection pooling
+- Drizzle ORM — type-safe schema-first SQL (`src/lib/schema.ts`, `src/lib/db.ts`)
+- Neon PostgreSQL — serverless, connection pooling (project: `restless-resonance-74035977`)
 
 ### AI + Automation
 - **Gemini 3.1 Flash-Lite Preview** — model string: `gemini-3.1-flash-lite-preview`. Do NOT use `gemini-2.0-flash` (shuts down June 1, 2026).
-- Inngest — 3 durable background functions (not yet implemented)
+- Inngest — 3 durable background functions *(not yet implemented)*
 - Resend + React Email — transactional email
 - Meta WhatsApp Cloud API (direct, no Twilio, no BSP markup)
 
@@ -67,81 +69,105 @@ npx tsc --noEmit       # Type-check without building
 
 Fluid type scale in `:root` via `clamp()` — `--text-xs` through `--text-hero`. Use these for headings, not fixed `px` values.
 
-`html, body` have `overflow: hidden` — the landing page uses fullscreen sections (`height: 100svh`), not traditional scroll.
+`html, body` have `overflow: hidden` — the landing page uses fullscreen sections (`height: 100svh`). Dashboard and other scrollable pages must use `height: 100svh; overflow-y: auto` on their **wrapper div**, not on body.
+
+`.db-select` class in `globals.css` — use for all `<select>` elements in the dashboard (avoids inline styles, includes focus state and option background).
 
 ## Auth — CRITICAL
-- `middleware.ts` at project root runs `clerkMiddleware()` — all routes are public by default
+- `src/middleware.ts` runs `clerkMiddleware()` — must be inside `src/` (not project root) when using `src/` directory layout. All routes are public by default.
 - `<ClerkProvider>` wraps children inside `<body>` in `src/app/layout.tsx`
 - Use `<Show when="signed-in">` / `<Show when="signed-out">` from `@clerk/nextjs` — **NOT** deprecated `<SignedIn>` / `<SignedOut>`
 - Use `useUser()` hook in client components to read auth state
-- Call `getOrCreateUser()` from `lib/auth.ts` at the top of every authenticated API route (lazy DB user creation on first API call — no webhook sync needed)
-- Sign-in page: `/sign-in` → `src/app/sign-in/[[...sign-in]]/page.tsx`
-- Sign-up page: `/sign-up` → `src/app/sign-up/[[...sign-up]]/page.tsx`
-- After sign-in/up both redirect to `/` (set via `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` and `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL`)
+- Call `getOrCreateUser()` from `src/lib/auth.ts` at the top of every authenticated API route — lazy DB user creation on first API call, no webhook sync needed
+- Sign-in: `/sign-in` → `src/app/sign-in/[[...sign-in]]/page.tsx`
+- Sign-up: `/sign-up` → `src/app/sign-up/[[...sign-up]]/page.tsx`
+- After sign-in/up both redirect to `/`
+
+## Database — 7 Tables (live on Neon)
+
+Schema: `src/lib/schema.ts` | Client: `src/lib/db.ts` (Neon HTTP driver) | Config: `drizzle.config.ts`
+
+- **users** — Clerk userId (text PK), email, name, businessName, plan (free/starter/pro), timezone
+- **customers** — uuid PK, userId FK, name, email, shopName. **No phone field.**
+- **products** — uuid PK, userId FK, name, description, rate (numeric 10,2), unit (pcs/kg/litre etc.)
+- **invoices** — uuid PK, userId FK, customerId FK, invoiceNumber, amount, currency, dueDate, issueDate, description, status, fileUrl, extractedData (jsonb), aiConfidence, paidAt, notes
+- **reminders** — uuid PK, invoiceId FK, type, channel (email/whatsapp/both), scheduledAt, sentAt, status, messageBody, error
+- **reminder_settings** — uuid PK, userId FK (unique), 7 boolean timing toggles (day30/14/7/3/1, dueDay, overdue), emailEnabled, whatsappEnabled, customMessage, senderName
+- **notifications** — audit log, uuid PK, userId FK, reminderId FK, channel, recipient, subject, status (delivered/bounced/failed/read), externalId, sentAt
 
 ## Navbar Architecture
-The navbar (`src/components/Navbar.tsx`) has no center nav links. Layout: **Logo (left) | Menu button + UserButton (right)**.
+`src/components/Navbar.tsx` — Layout: **Logo (left) | Menu button + UserButton (right)**
 
-- **Menu button**: "Menu" text with animated underline dash. On hover, runs a character-scramble animation (`useTextScramble` hook, 40ms interval, left-to-right reveal).
-- **Menu overlay**: Click opens a right-side slide-in panel (`min(420px, 88vw)`) with Framer Motion spring. Backdrop click or Escape closes it.
-- **Panel items**: Roman numerals I. II. III. in Cormorant Garamond italic (`--font-serif`), amber `--color-secondary`. Staggered entrance animation.
-- **Auth guard on nav links**: `handleNavClick()` checks `isSignedIn` — redirects to `/sign-in` if not authenticated, navigates to section anchor if authenticated.
-- **UserButton**: `<Show when="signed-in"><UserButton /></Show>` appears after the Menu button when signed in.
+- **Menu button**: "Menu" text + animated underline dash. Hover triggers `useTextScramble` (40ms interval, left-to-right).
+- **Menu overlay**: Right-side slide-in panel (`min(420px, 88vw)`), Framer Motion spring. Backdrop click or Escape closes.
+- **Panel items**: Roman numerals I–IV in Cormorant Garamond italic, amber `--color-secondary`. Staggered entrance.
+  - I. Features → `#features`, II. How It Works → `#how-it-works`, III. Pricing → `#pricing`, IV. Dashboard → `/dashboard`
+- **Auth guard**: `handleNavClick()` — redirects to `/sign-in` if not authenticated, navigates otherwise.
+- **UserButton**: `<Show when="signed-in"><UserButton /></Show>` after the Menu button.
 
-## Landing Page — What's Built
+## Landing Page
 `src/app/page.tsx` assembles: `<CustomCursor />` + `<Navbar />` + `<HeroSection />`
 
-### HeroSection
-- Two Cloudinary-hosted `.webm` videos cycle with a page-flip transition (Framer Motion, skew sweep)
-- Active video plays once (triggers flip on `ended`); inactive video loops silently in background
-- Mute/unmute toggle button bottom-right
+### HeroSection (`src/components/HeroSection.tsx`)
+- Two Cloudinary `.webm` videos cycle with page-flip transition (Framer Motion skew sweep)
+- Active video plays once (flip on `ended`); inactive loops silently in background
+- Mute/unmute toggle bottom-right
 - Animated headline stagger (Bebas Neue, `clamp` sizing)
-- When signed in: shows `"Welcome back, {username} —"` as an absolutely positioned overlay (Cormorant Garamond italic, amber) — uses `user.username ?? user.firstName ?? "there"` priority
-- "Start Free →" CTA links to `/sign-up`
+- Signed-in state: `"Welcome back, {username} —"` overlay (Cormorant Garamond italic, amber) — priority: `username ?? firstName ?? "there"`
+- "Start Free →" CTA → `/sign-up`
 
-### CustomCursor
-`src/components/CustomCursor.tsx` — hides OS cursor globally, renders:
+### CustomCursor (`src/components/CustomCursor.tsx`)
 - Outer ring: 36px, indigo `#818CF8` border, spring-lagged (`useSpring`)
 - Center dot: 5px, amber `#F59E0B` with glow, snaps precisely to mouse
 
-## Gemini
+## Dashboard (`src/app/dashboard/page.tsx`)
+Client component. Redirects to `/sign-in` if not authenticated. Three tabs:
+
+- **I. Buyers** — Add/list customers (name, email, shop name). POST/GET `/api/customers`
+- **II. Products** — Add/list goods with rate (₹) and unit. POST/GET `/api/products`. Displayed as amber-rate cards.
+- **III. Sales** — Coming soon placeholder + price list table (product name, description, rate, unit) for reference while writing a sale.
+
+## API Routes
+All routes call `getOrCreateUser()` first, validate input with Zod, return `{ success, data?, error? }`.
+
+| Route | Methods | Purpose |
+|---|---|---|
+| `/api/customers` | GET, POST | List / create buyers |
+| `/api/products` | GET, POST | List / create goods |
+
+## Gemini *(not yet implemented)*
 - Model: `gemini-3.1-flash-lite-preview`
 - Config: `responseMimeType: 'application/json'`, `temperature: 0.1`
-- File: `lib/gemini.ts` → `extractInvoiceData(fileBase64, mimeType)` *(file not yet created)*
+- File: `src/lib/gemini.ts` → `extractInvoiceData(fileBase64, mimeType)`
 
 ## Inngest — 3 Functions *(not yet implemented)*
 1. **notifyOwner** — event: `invoice/created`, immediate confirmation email to invoice owner
 2. **scheduleReminders** — event: `invoice/created`, `step.sleepUntil()` for up to 7 reminder slots
 3. **checkOverdue** — cron: `0 9 * * *`, marks pending past-due invoices as overdue
 
-## Database — 6 Tables (Drizzle + Neon) *(schema not yet created)*
-- **users** — Clerk userId as PK, email, name, businessName, plan (free/starter/pro), timezone
-- **customers** — userId FK, name, email, phone (E.164), company
-- **invoices** — userId FK, customerId FK, invoiceNumber, amount, currency, dueDate, issueDate, description, status (pending/due_soon/overdue/paid/cancelled), fileUrl, extractedData (jsonb), aiConfidence, paidAt, notes
-- **reminders** — invoiceId FK, type, channel (email/whatsapp/both), scheduledAt, sentAt, status, messageBody, error
-- **reminder_settings** — userId FK, 7 boolean timing toggles, emailEnabled, whatsappEnabled, customMessage, senderName
-- **notifications** — audit log, userId FK, reminderId FK, channel, recipient, subject, status (delivered/bounced/failed/read), externalId, sentAt
-
-Run migrations: `npx drizzle-kit push` (use `DATABASE_URL_UNPOOLED`)
-
-## WhatsApp
+## WhatsApp *(not yet implemented)*
 - Provider: Meta WhatsApp Cloud API — **NOT Twilio**
 - Endpoint: `https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages`
 - Auth: Bearer `META_WHATSAPP_ACCESS_TOKEN`
 - Template: `payment_reminder` (UTILITY — must be Meta-approved)
-- Code: `lib/whatsapp.ts` → `sendWhatsAppReminder()` *(file not yet created)*
+- File: `src/lib/whatsapp.ts` → `sendWhatsAppReminder()`
 
 ## Key File Paths
 | File | Purpose |
 |---|---|
-| `middleware.ts` | Clerk middleware — must be at project root, named exactly this |
-| `src/app/globals.css` | Color system, fluid type scale, global resets |
+| `src/middleware.ts` | Clerk middleware — must be inside `src/` when using `src/` directory layout |
+| `drizzle.config.ts` | Drizzle Kit config (uses `DATABASE_URL_UNPOOLED`) |
+| `src/lib/schema.ts` | All 7 Drizzle table schemas + exported types |
+| `src/lib/db.ts` | Neon HTTP driver → Drizzle client |
+| `src/lib/auth.ts` | `getOrCreateUser()` — Clerk→DB lazy sync |
+| `src/app/globals.css` | Color system, fluid type scale, `.db-select` class |
 | `src/app/layout.tsx` | Fonts (3 families), ClerkProvider, metadata |
-| `src/app/page.tsx` | Landing page — CustomCursor + Navbar + HeroSection |
-| `src/app/sign-in/[[...sign-in]]/page.tsx` | Clerk SignIn component page |
-| `src/app/sign-up/[[...sign-up]]/page.tsx` | Clerk SignUp component page |
-| `src/components/Navbar.tsx` | Menu button, scramble animation, slide-in panel, auth guard |
-| `src/components/HeroSection.tsx` | Video hero, flip transition, welcome message |
+| `src/app/page.tsx` | Landing page |
+| `src/app/dashboard/page.tsx` | Dashboard — tabs: Buyers, Products, Sales |
+| `src/app/api/customers/route.ts` | Buyers API |
+| `src/app/api/products/route.ts` | Products API |
+| `src/components/Navbar.tsx` | Menu, scramble animation, slide-in panel, auth guard |
+| `src/components/HeroSection.tsx` | Video hero, flip transition, welcome overlay |
 | `src/components/CustomCursor.tsx` | Spring-physics custom cursor |
 | `next.config.ts` | Cloudinary image domain whitelist |
 
@@ -150,16 +176,17 @@ Run migrations: `npx drizzle-kit push` (use `DATABASE_URL_UNPOOLED`)
 - Server components by default — `'use client'` only when needed
 - Zod validation on all API inputs
 - All API routes return `{ success: boolean, data?, error? }`
-- Phone numbers always E.164 format (`+919876543210`)
-- Never expose secrets client-side
-- No `twilio` package anywhere
+- No inline styles on form elements — use CSS classes (e.g. `.db-select`)
+- All `<select>` elements must have an accessible name via linked `<label htmlFor>` + `id`
 - Buttons outside `<form>` must have `type="button"`
+- No `twilio` package anywhere
+- Never expose secrets client-side
 
 ## Environment Variables
-Stored in `.env` at project root (not `.env.local`). Must also be added to Vercel dashboard manually — this file is never committed.
+Stored in `.env` at project root (not `.env.local`). Add to Vercel dashboard manually — never committed.
 
 - **Clerk**: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`, `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`, `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
-- **Neon**: `DATABASE_URL` (pooled), `DATABASE_URL_UNPOOLED` (for drizzle-kit push)
+- **Neon**: `DATABASE_URL` (pooled, used by app), `DATABASE_URL_UNPOOLED` (direct, for drizzle-kit push only)
 - **Gemini**: `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-3.1-flash-lite-preview`
 - **Resend**: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_FROM_NAME`
 - **Meta WhatsApp**: `META_WHATSAPP_ACCESS_TOKEN`, `META_WHATSAPP_PHONE_NUMBER_ID`, `META_WHATSAPP_BUSINESS_ACCOUNT_ID`, `META_APP_ID`, `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`

@@ -36,3 +36,26 @@ body {
   background: var(--color-primary);
   color: var(--color-bg);
 }
+
+/* Dashboard form select */
+.db-select {
+  background: rgba(13, 20, 38, 0.8);
+  border: 1px solid rgba(129, 140, 248, 0.2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+  appearance: none;
+}
+
+.db-select:focus {
+  border-color: var(--color-primary);
+}
+
+.db-select option {
+  background: #0d1426;
+}
