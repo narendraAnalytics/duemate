@@ -1,45 +1,41 @@
-17:20:27.914 Running build in Washington, D.C., USA (East) – iad1
-17:20:27.915 Build machine configuration: 2 cores, 8 GB
-17:20:28.112 Cloning github.com/narendraAnalytics/duemate (Branch: main, Commit: 7c22aee)
-17:20:29.250 Cloning completed: 1.137s
-17:20:29.867 Restored build cache from previous deployment (9UJsAL2DCmZD64VxaJX7zQ641RSJ)
-17:20:30.330 Running "vercel build"
-17:20:30.948 Vercel CLI 50.38.2
-17:20:31.224 Installing dependencies...
-17:20:32.419 
-17:20:32.419 up to date in 963ms
-17:20:32.420 
-17:20:32.420 48 packages are looking for funding
-17:20:32.421   run `npm fund` for details
-17:20:32.448 Detected Next.js version: 16.2.2
-17:20:32.453 Running "npm run build"
-17:20:33.752 
-17:20:33.753 > duemate@0.1.0 build
-17:20:33.754 > next build
-17:20:33.754 
-17:20:34.530 ▲ Next.js 16.2.2 (Turbopack)
-17:20:34.532 
-17:20:34.541 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
-17:20:34.565   Creating an optimized production build ...
-17:20:48.359 ✓ Compiled successfully in 13.4s
-17:20:48.361   Running TypeScript ...
-17:20:54.584   Finished TypeScript in 6.2s ...
-17:20:54.588   Collecting page data using 1 worker ...
-17:20:55.040 Error: DATABASE_URL is not set
-17:20:55.040     at module evaluation (.next/server/chunks/[root-of-the-server]__0rhvnlg._.js:68:48534)
-17:20:55.041     at instantiateModule (.next/server/chunks/[turbopack]_runtime.js:853:9)
-17:20:55.041     at getOrInstantiateModuleFromParent (.next/server/chunks/[turbopack]_runtime.js:877:12)
-17:20:55.041     at Context.esmImport [as i] (.next/server/chunks/[turbopack]_runtime.js:281:20)
-17:20:55.041     at module evaluation (.next/server/chunks/[root-of-the-server]__0paikfp._.js:1:10509)
-17:20:55.041     at instantiateModule (.next/server/chunks/[turbopack]_runtime.js:853:9)
-17:20:55.041     at instantiateRuntimeModule (.next/server/chunks/[turbopack]_runtime.js:882:12)
-17:20:55.041     at getOrInstantiateRuntimeModule (.next/server/chunks/[turbopack]_runtime.js:895:12)
-17:20:55.041     at Object.m (.next/server/chunks/[turbopack]_runtime.js:898:18)
-17:20:55.041     at Object.<anonymous> (.next/server/app/api/customers/route.js:6:3)
-17:20:55.547 
-17:20:55.548 > Build error occurred
-17:20:55.550 Error: Failed to collect page data for /api/customers
-17:20:55.551     at ignore-listed frames {
-17:20:55.551   type: 'Error'
-17:20:55.551 }
-17:20:55.588 Error: Command "npm run build" exited with 1
+Now update the preview modal totals section to show the breakdown. Find it:
+                                                                                          
+  Searched for 2 patterns (ctrl+o to expand)  
+                                                                                                                                            
+● Update(src\app\dashboard\page.tsx)
+  ⎿  PreToolUse:Edit hook error                                                                                                             
+  ⎿  Added 7 lines, removed 3 lines                                                                                                         
+      1533                  {/* Totals */}                                                                                                  
+      1534                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "16px 20px", background: D.s       
+            urfaceAlt, borderRadius: D.radiusSm, border: `1px solid ${D.borderFaint}` }}>                                                         1535                    {[                                                                                                            
+      1536 +                    { label: "Subtotal", val: subtotal, color: D.textMid, large: false },                                             1537 +                    ...(discountAmt > 0 ? [{ label: `Discount${form.discountType === "percent" ? ` (${form.discountValue}       
+           +%)` : ""}`, val: -discountAmt, color: "#16A34A", large: false }] : []),                                                         
+      1538 +                    ...(discountAmt > 0 ? [{ label: "Taxable Amount", val: afterDiscount, color: D.textMid, large: false        
+           +}] : []),                                                                                                                       
+      1539 +                    ...(taxAmt > 0 ? [{ label: `GST (${form.taxRate}%)`, val: taxAmt, color: D.primary, large: false }] :       
+           + []),                                                                                                                           
+      1540                      { label: "Invoice Total", val: total, color: D.text, large: true },
+      1541                      ...(paidPreview > 0 ? [
+      1542                        { label: `Amount Paid${form.paymentType ? ` (${form.paymentType})` : ""}`, val: paidPreview, color:
+             "#16A34A", large: false },
+      1543                        { label: "Balance Due", val: balancePreview, color: balancePreview > 0 ? "#DC2626" : "#16A34A", lar
+            ge: false },
+      1544                      ] : []),
+      1541 -                  ].map(({ label, val, color, large }) => (                                                              
+      1542 -                    <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}
+           ->                                                                                                                        
+      1545 +                  ].map(({ label, val, color, large }, idx, arr) => (                                                    
+      1546 +                    <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", b
+           +orderTop: label === "Invoice Total" && arr.length > 1 ? `1px solid ${D.borderFaint}` : "none", paddingTop: label === "Inv
+           +oice Total" && arr.length > 1 ? "8px" : 0, marginTop: label === "Invoice Total" && arr.length > 1 ? "4px" : 0 }}>        
+      1547                        <span style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: D.textMid, fontWeight: 500 
+            }}>{label}</span>
+      1548                        <span style={{ fontFamily: "var(--font-display)", fontSize: large ? "1.6rem" : "1.1rem", color, let
+            terSpacing: "0.02em", lineHeight: 1 }}>
+      1545 -                        {currSymbol}{val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      1549 +                        {val < 0 ? "-" : ""}{currSymbol}{Math.abs(val).toLocaleString("en-IN", { minimumFractionDigits: 2
+           +, maximumFractionDigits: 2 })}                                                                                           
+      1550                        </span>
+      1551                      </div>
+      1552                    ))}
+  ⎿  You've hit your limit · resets 1:30am (Asia/Calcutta)

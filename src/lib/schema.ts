@@ -60,6 +60,8 @@ export const customers = pgTable("customers", {
   name: text("name").notNull(),
   email: text("email"),
   shopName: text("shop_name"),
+  phone: text("phone"),
+  gstin: text("gstin"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -78,6 +80,13 @@ export const products = pgTable("products", {
   rate: numeric("rate", { precision: 10, scale: 2 }).notNull(),
   unit: text("unit").default("pcs"), // e.g. kg, pcs, litre, box
   quantity: integer("quantity").default(0).notNull(), // current stock count
+  gstRate: numeric("gst_rate", { precision: 5, scale: 2 }).default("0"),
+  purchaseRate: numeric("purchase_rate", { precision: 10, scale: 2 }),
+  purchaseDate: timestamp("purchase_date"),
+  supplierShop: text("supplier_shop"),
+  supplierPhone: text("supplier_phone"),
+  supplierGstin: text("supplier_gstin"),
+  hsnCode: text("hsn_code"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -99,13 +108,24 @@ export const invoices = pgTable("invoices", {
   currency: text("currency").default("INR"),
   dueDate: timestamp("due_date"),
   issueDate: timestamp("issue_date"),
-  description: text("description"),
   status: invoiceStatusEnum("status").default("pending").notNull(),
-  fileUrl: text("file_url"),
-  extractedData: jsonb("extracted_data"),
-  aiConfidence: real("ai_confidence"),
+  discountType: text("discount_type").default("flat"),   // "flat" | "percent"
+  discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).default("0"),
+  taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).default("0"),
+  taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
+  paymentType: text("payment_type"),           // "cash" | "online" | null
+  paidAmount: numeric("paid_amount", { precision: 12, scale: 2 }).default("0"),
+  paidCash: numeric("paid_cash", { precision: 12, scale: 2 }).default("0"),
+  paidOnline: numeric("paid_online", { precision: 12, scale: 2 }).default("0"),
+  balanceAmount: numeric("balance_amount", { precision: 12, scale: 2 }),
   paidAt: timestamp("paid_at"),
+  lastPaymentAt: timestamp("last_payment_at"),
+  paymentReference: text("payment_reference"),
+  paymentNotes: text("payment_notes"),
   notes: text("notes"),
+  extractedData: jsonb("extracted_data"),      // stores line items array
+  fileUrl: text("file_url"),                   // future: uploaded invoice PDF
+  aiConfidence: real("ai_confidence"),         // future: AI extraction confidence
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

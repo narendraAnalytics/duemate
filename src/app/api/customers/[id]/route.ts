@@ -5,9 +5,9 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { customers } from "@/lib/schema";
 import { getOrCreateUser } from "@/lib/auth";
-import { eq, desc } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-const createSchema = z.object({
+const updateSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email"),
   shopName: z.string().min(1, "Shop name is required"),
@@ -15,28 +15,15 @@ const createSchema = z.object({
   gstin: z.string().optional(),
 });
 
-export async function GET() {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await getOrCreateUser();
-    const list = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.userId, user.id))
-      .orderBy(desc(customers.createdAt));
-    return NextResponse.json({ success: true, data: list });
-  } catch (err) {
-    console.error("[GET /api/customers]", err);
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    const status = msg === "Unauthorized" ? 401 : 500;
-    return NextResponse.json({ success: false, error: msg }, { status });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const user = await getOrCreateUser();
+    const { id } = await params;
     const body = await req.json();
-    const parsed = createSchema.safeParse(body);
+    const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { success: false, error: parsed.error.flatten().fieldErrors },
@@ -45,19 +32,23 @@ export async function POST(req: NextRequest) {
     }
 
     const { name, email, shopName, phone, gstin } = parsed.data;
-    const [created] = await db
-      .insert(customers)
-      .values({
-        userId: user.id,
+    const [updated] = await db
+      .update(customers)
+      .set({
         name,
         email,
         shopName,
         phone: phone || null,
         gstin: gstin || null,
       })
+      .where(and(eq(customers.id, id), eq(customers.userId, user.id)))
       .returning();
 
-    return NextResponse.json({ success: true, data: created }, { status: 201 });
+    if (!updated) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, data: updated });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     const status = msg === "Unauthorized" ? 401 : 500;

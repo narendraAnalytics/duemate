@@ -22,7 +22,7 @@ npx drizzle-kit studio # Visual DB browser
 npx tsc --noEmit       # Type-check without building
 ```
 
-> Schema migrations can also be applied via the **Neon MCP server** (`prepare_database_migration` → `complete_database_migration`) without needing `DATABASE_URL_UNPOOLED`.
+> Schema migrations can also be applied via the **Neon MCP server** (`prepare_database_migration` → `complete_database_migration`) without needing `DATABASE_URL_UNPOOLED`. Neon project ID: `restless-resonance-74035977`.
 
 ## Stack
 
@@ -38,13 +38,12 @@ npx tsc --noEmit       # Type-check without building
 - shadcn/ui — accessible pre-built components
 - Lucide React — icons
 - React Hook Form + Zod — type-safe form validation
-- Recharts — dashboard charts
 
 ### Backend
 - Next.js 16 API Routes (App Router)
 - Clerk v7 — auth + middleware. **NO webhooks. NO CLERK_WEBHOOK_SECRET.**
 - Drizzle ORM — type-safe schema-first SQL (`src/lib/schema.ts`, `src/lib/db.ts`)
-- Neon PostgreSQL — serverless, connection pooling (project: `restless-resonance-74035977`)
+- Neon PostgreSQL — serverless, connection pooling
 
 ### AI + Automation
 - **Gemini 3.1 Flash-Lite Preview** — model string: `gemini-3.1-flash-lite-preview`. Do NOT use `gemini-2.0-flash` (shuts down June 1, 2026).
@@ -71,7 +70,7 @@ Fluid type scale in `:root` via `clamp()` — `--text-xs` through `--text-hero`.
 
 `html, body` have `overflow: hidden` — the landing page uses fullscreen sections (`height: 100svh`). Dashboard and other scrollable pages must use `height: 100svh; overflow-y: auto` on their **wrapper div**, not on body.
 
-`.db-select` class in `globals.css` — use for all `<select>` elements in the dashboard (avoids inline styles, includes focus state and option background).
+`.db-select` / `.db-select-light` classes in `globals.css` — use for all `<select>` elements in the dashboard. `.db-select-light` is for the light-background dashboard forms.
 
 ## Auth — CRITICAL
 - `src/proxy.ts` runs `clerkMiddleware()` — must be inside `src/` (not project root) when using `src/` directory layout. All routes are public by default.
@@ -79,61 +78,106 @@ Fluid type scale in `:root` via `clamp()` — `--text-xs` through `--text-hero`.
 - Use `<Show when="signed-in">` / `<Show when="signed-out">` from `@clerk/nextjs` — **NOT** deprecated `<SignedIn>` / `<SignedOut>`
 - Use `useUser()` hook in client components to read auth state
 - Call `getOrCreateUser()` from `src/lib/auth.ts` at the top of every authenticated API route — lazy DB user creation on first API call, no webhook sync needed
-- Sign-in: `/sign-in` → `src/app/sign-in/[[...sign-in]]/page.tsx`
-- Sign-up: `/sign-up` → `src/app/sign-up/[[...sign-up]]/page.tsx`
-- After sign-in/up both redirect to `/`
 
 ## Database — 7 Tables (live on Neon)
 
 Schema: `src/lib/schema.ts` | Client: `src/lib/db.ts` (Neon HTTP driver) | Config: `drizzle.config.ts`
 
 - **users** — Clerk userId (text PK), email, name, businessName, plan (free/starter/pro), timezone
-- **customers** — uuid PK, userId FK, name, email, shopName. **No phone field.**
-- **products** — uuid PK, userId FK, name, description, rate (numeric 10,2), unit (pcs/kg/litre etc.)
-- **invoices** — uuid PK, userId FK, customerId FK, invoiceNumber, amount, currency, dueDate, issueDate, description, status, fileUrl, extractedData (jsonb), aiConfidence, paidAt, notes
+- **customers** — uuid PK, userId FK, name, email (required), shopName (required), phone, gstin (15-char GSTIN format)
+- **products** — uuid PK, userId FK, name, description, rate (selling price), unit, quantity (stock), gstRate, purchaseRate, purchaseDate, supplierShop, supplierPhone, supplierGstin, hsnCode
+- **invoices** — uuid PK, userId FK, customerId FK, invoiceNumber, amount, currency, dueDate, issueDate, status (pending/due_soon/overdue/paid/cancelled), discountType/discountAmount, taxRate/taxAmount, paymentType, paidAmount, balanceAmount, paidAt, lastPaymentAt, paymentReference, notes, extractedData (jsonb — stores line items array), fileUrl, aiConfidence
 - **reminders** — uuid PK, invoiceId FK, type, channel (email/whatsapp/both), scheduledAt, sentAt, status, messageBody, error
 - **reminder_settings** — uuid PK, userId FK (unique), 7 boolean timing toggles (day30/14/7/3/1, dueDay, overdue), emailEnabled, whatsappEnabled, customMessage, senderName
 - **notifications** — audit log, uuid PK, userId FK, reminderId FK, channel, recipient, subject, status (delivered/bounced/failed/read), externalId, sentAt
 
-## Navbar Architecture
-`src/components/Navbar.tsx` — Layout: **Logo (left) | Menu button + UserButton (right)**
-
-- **Menu button**: "Menu" text + animated underline dash. Hover triggers `useTextScramble` (40ms interval, left-to-right).
-- **Menu overlay**: Right-side slide-in panel (`min(420px, 88vw)`), Framer Motion spring. Backdrop click or Escape closes.
-- **Panel items**: Roman numerals I–IV in Cormorant Garamond italic, amber `--color-secondary`. Staggered entrance.
-  - I. Features → `#features`, II. How It Works → `#how-it-works`, III. Pricing → `#pricing`, IV. Dashboard → `/dashboard`
-- **Auth guard**: `handleNavClick()` — redirects to `/sign-in` if not authenticated, navigates otherwise.
-- **UserButton**: `<Show when="signed-in"><UserButton /></Show>` after the Menu button.
-
-## Landing Page
-`src/app/page.tsx` assembles: `<CustomCursor />` + `<Navbar />` + `<HeroSection />`
-
-### HeroSection (`src/components/HeroSection.tsx`)
-- Two Cloudinary `.webm` videos cycle with page-flip transition (Framer Motion skew sweep)
-- Active video plays once (flip on `ended`); inactive loops silently in background
-- Mute/unmute toggle bottom-right
-- Animated headline stagger (Bebas Neue, `clamp` sizing)
-- Signed-in state: `"Welcome back, {username} —"` overlay (Cormorant Garamond italic, amber) — priority: `username ?? firstName ?? "there"`
-- "Start Free →" CTA → `/sign-up`
-
-### CustomCursor (`src/components/CustomCursor.tsx`)
-- Outer ring: 36px, indigo `#818CF8` border, spring-lagged (`useSpring`)
-- Center dot: 5px, amber `#F59E0B` with glow, snaps precisely to mouse
+### Dynamic Route Params — Next.js 15
+In `[id]` API routes, `params` is a **Promise** and must be awaited:
+```ts
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+```
+Forgetting `await params` causes silent "Not found" errors as `id` resolves to undefined.
 
 ## Dashboard (`src/app/dashboard/page.tsx`)
-Client component. Redirects to `/sign-in` if not authenticated. Three tabs:
+Large client component (`'use client'`). All tabs live in one file. Redirects to `/sign-in` if not authenticated.
 
-- **I. Buyers** — Add/list customers (name, email, shop name). POST/GET `/api/customers`
-- **II. Products** — Add/list goods with rate (₹) and unit. POST/GET `/api/products`. Displayed as amber-rate cards.
-- **III. Sales** — Coming soon placeholder + price list table (product name, description, rate, unit) for reference while writing a sale.
+### Tab Architecture
+Three tabs rendered by `<DashboardTabs>` → each tab is its own function component defined in the same file:
+
+- **I. Buyers (`CustomersSection`)** — Add/edit/list buyers. Inline row edit with `editingId` state. Validation: phone must be 10 digits (`/^\d{10}$/`), GSTIN must match `/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/`. `validateBuyerFields()` is a module-level shared validator.
+- **II. Products (`ProductsSection` + `ProductCard`)** — Add products via form; each saved product renders as a `ProductCard` with inline edit (`editing` state inside the card). Form order: Purchase Rate → Selling Rate. Purchase Total auto-computes from `purchaseRate × quantity × (1 + gstRate/100)`. ProductCard view shows margin % (selling − purchase rate).
+- **III. Sales (`SalesSection` + `InvoiceList`)** — Invoice creation form with preview modal before saving. `InvoiceList` renders saved invoices as expandable rows. Expanded panel shows full financial breakdown + **Record Payment** inline form (calls `PATCH /api/invoices/[id]`).
+
+### Dashboard Internal Components
+Defined inside `page.tsx`, not as separate files:
+- `InputField` — label with amber `*` when `required`, focus border color via `focused` state
+- `SubmitButton` — loading spinner state
+- `SectionHeading` — title + italic serif subtitle
+- `StockBadge` — green/amber/red stock level pill
+- `ProductCard` — card with `AnimatePresence` between view/edit mode
+- `InvoiceList` — takes `{ invoiceList, fetching, onRefresh }` props; manages `expanded`, `payingId`, `payDraft` state internally
+
+### Invoice Form Flow
+1. User fills form → clicks "Preview Invoice" → `handlePreview()` validates → sets `showPreview = true`
+2. Preview modal shows full invoice layout with computed totals
+3. "Save Invoice" in modal → `handleSave()` → `POST /api/invoices` → stock quantities decremented server-side → `fetchAll()` refreshes all three data sets
+4. Saved invoices appear in `InvoiceList` below the form, expandable for full detail
+
+### Computed Invoice Values
+All calculated client-side before preview and display:
+```ts
+const subtotal = lineItems.reduce((s, li) => s + li.subtotal, 0);
+const discountAmt = discountType === "flat" ? flat : subtotal * (pct/100);
+const afterDiscount = Math.max(0, subtotal - discountAmt);
+const taxAmt = afterDiscount * (taxRate / 100);
+const total = afterDiscount + taxAmt;
+```
 
 ## API Routes
-All routes call `getOrCreateUser()` first, validate input with Zod, return `{ success, data?, error? }`.
+All routes call `getOrCreateUser()` first, validate with Zod, return `{ success, data?, error? }`.
 
 | Route | Methods | Purpose |
 |---|---|---|
 | `/api/customers` | GET, POST | List / create buyers |
-| `/api/products` | GET, POST | List / create goods |
+| `/api/customers/[id]` | PATCH | Update buyer details |
+| `/api/products` | GET, POST | List / create products |
+| `/api/products/[id]` | PATCH | Update product + stock |
+| `/api/invoices` | GET, POST | List (with customer join) / create invoices |
+| `/api/invoices/[id]` | PATCH | Record payment — adds `additionalPayment` to `paidAmount`, sets `lastPaymentAt`, optionally stores `paymentReference`. Sets status to `"paid"` when balance reaches zero. |
+
+## Key File Paths
+| File | Purpose |
+|---|---|
+| `src/proxy.ts` | Clerk middleware — must be inside `src/` when using `src/` directory layout |
+| `drizzle.config.ts` | Drizzle Kit config (uses `DATABASE_URL_UNPOOLED`) |
+| `src/lib/schema.ts` | All 7 Drizzle table schemas + exported types |
+| `src/lib/db.ts` | Neon HTTP driver → Drizzle client |
+| `src/lib/auth.ts` | `getOrCreateUser()` — Clerk→DB lazy sync |
+| `src/app/globals.css` | Color system, fluid type scale, `.db-select` / `.db-select-light` classes |
+| `src/app/layout.tsx` | Fonts (3 families), ClerkProvider, metadata |
+| `src/app/page.tsx` | Landing page |
+| `src/app/dashboard/page.tsx` | Dashboard — all tabs + internal components (1 large file) |
+| `src/app/api/customers/route.ts` | Buyers list + create |
+| `src/app/api/customers/[id]/route.ts` | Buyer PATCH |
+| `src/app/api/products/route.ts` | Products list + create |
+| `src/app/api/products/[id]/route.ts` | Product PATCH |
+| `src/app/api/invoices/route.ts` | Invoices list (left-joins customers) + create |
+| `src/app/api/invoices/[id]/route.ts` | Invoice payment PATCH |
+| `src/components/Navbar.tsx` | Menu, scramble animation, slide-in panel, auth guard |
+| `src/components/HeroSection.tsx` | Video hero, flip transition, welcome overlay |
+| `src/components/CustomCursor.tsx` | Spring-physics custom cursor |
+| `next.config.ts` | Cloudinary image domain whitelist |
+
+## Coding Standards
+- TypeScript strict mode throughout
+- Server components by default — `'use client'` only when needed
+- Zod validation on all API inputs
+- All API routes return `{ success: boolean, data?, error? }`
+- No inline styles on form elements — use CSS classes (`.db-select-light`)
+- All `<select>` elements must have accessible name via linked `<label htmlFor>` + `id`, or `aria-label`
+- Buttons outside `<form>` must have `type="button"`
+- No `twilio` package anywhere
 
 ## Gemini *(not yet implemented)*
 - Model: `gemini-3.1-flash-lite-preview`
@@ -151,36 +195,6 @@ All routes call `getOrCreateUser()` first, validate input with Zod, return `{ su
 - Auth: Bearer `META_WHATSAPP_ACCESS_TOKEN`
 - Template: `payment_reminder` (UTILITY — must be Meta-approved)
 - File: `src/lib/whatsapp.ts` → `sendWhatsAppReminder()`
-
-## Key File Paths
-| File | Purpose |
-|---|---|
-| `src/proxy.ts` | Clerk middleware — must be inside `src/` when using `src/` directory layout |
-| `drizzle.config.ts` | Drizzle Kit config (uses `DATABASE_URL_UNPOOLED`) |
-| `src/lib/schema.ts` | All 7 Drizzle table schemas + exported types |
-| `src/lib/db.ts` | Neon HTTP driver → Drizzle client |
-| `src/lib/auth.ts` | `getOrCreateUser()` — Clerk→DB lazy sync |
-| `src/app/globals.css` | Color system, fluid type scale, `.db-select` class |
-| `src/app/layout.tsx` | Fonts (3 families), ClerkProvider, metadata |
-| `src/app/page.tsx` | Landing page |
-| `src/app/dashboard/page.tsx` | Dashboard — tabs: Buyers, Products, Sales |
-| `src/app/api/customers/route.ts` | Buyers API |
-| `src/app/api/products/route.ts` | Products API |
-| `src/components/Navbar.tsx` | Menu, scramble animation, slide-in panel, auth guard |
-| `src/components/HeroSection.tsx` | Video hero, flip transition, welcome overlay |
-| `src/components/CustomCursor.tsx` | Spring-physics custom cursor |
-| `next.config.ts` | Cloudinary image domain whitelist |
-
-## Coding Standards
-- TypeScript strict mode throughout
-- Server components by default — `'use client'` only when needed
-- Zod validation on all API inputs
-- All API routes return `{ success: boolean, data?, error? }`
-- No inline styles on form elements — use CSS classes (e.g. `.db-select`)
-- All `<select>` elements must have an accessible name via linked `<label htmlFor>` + `id`
-- Buttons outside `<form>` must have `type="button"`
-- No `twilio` package anywhere
-- Never expose secrets client-side
 
 ## Environment Variables
 Stored in `.env` at project root (not `.env.local`). Add to Vercel dashboard manually — never committed.

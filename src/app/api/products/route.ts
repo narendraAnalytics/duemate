@@ -13,6 +13,13 @@ const createSchema = z.object({
   rate: z.number().positive("Rate must be positive"),
   unit: z.string().optional().default("pcs"),
   quantity: z.number().int().min(0).default(0),
+  gstRate: z.number().min(0).default(0),
+  purchaseRate: z.number().positive().optional(),
+  purchaseDate: z.string().optional(),
+  supplierShop: z.string().optional(),
+  supplierPhone: z.string().optional(),
+  supplierGstin: z.string().optional(),
+  hsnCode: z.string().optional(),
 });
 
 export async function GET() {
@@ -44,7 +51,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, description, rate, unit, quantity } = parsed.data;
+    const { name, description, rate, unit, quantity, gstRate, purchaseRate, purchaseDate, supplierShop, supplierPhone, supplierGstin, hsnCode } = parsed.data;
     const [created] = await db
       .insert(products)
       .values({
@@ -54,6 +61,13 @@ export async function POST(req: NextRequest) {
         rate: rate.toString(),
         unit: unit || "pcs",
         quantity,
+        gstRate: gstRate.toString(),
+        purchaseRate: purchaseRate ? purchaseRate.toString() : null,
+        purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
+        supplierShop: supplierShop || null,
+        supplierPhone: supplierPhone || null,
+        supplierGstin: supplierGstin || null,
+        hsnCode: hsnCode || null,
       })
       .returning();
 

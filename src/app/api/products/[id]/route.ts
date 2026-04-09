@@ -13,6 +13,13 @@ const updateSchema = z.object({
   rate: z.number().positive().optional(),
   unit: z.string().optional(),
   quantity: z.number().int().min(0).optional(),
+  gstRate: z.number().min(0).optional(),
+  purchaseRate: z.number().positive().optional().nullable(),
+  purchaseDate: z.string().optional().nullable(),
+  supplierShop: z.string().optional().nullable(),
+  supplierPhone: z.string().optional().nullable(),
+  supplierGstin: z.string().optional().nullable(),
+  hsnCode: z.string().optional().nullable(),
 });
 
 export async function PATCH(
@@ -41,6 +48,13 @@ export async function PATCH(
         ...(data.rate !== undefined && { rate: data.rate.toString() }),
         ...(data.unit !== undefined && { unit: data.unit }),
         ...(data.quantity !== undefined && { quantity: data.quantity }),
+        ...(data.gstRate !== undefined && { gstRate: data.gstRate.toString() }),
+        ...(data.purchaseRate !== undefined && { purchaseRate: data.purchaseRate ? data.purchaseRate.toString() : null }),
+        ...(data.purchaseDate !== undefined && { purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null }),
+        ...(data.supplierShop !== undefined && { supplierShop: data.supplierShop }),
+        ...(data.supplierPhone !== undefined && { supplierPhone: data.supplierPhone }),
+        ...(data.supplierGstin !== undefined && { supplierGstin: data.supplierGstin }),
+        ...(data.hsnCode !== undefined && { hsnCode: data.hsnCode }),
       })
       .where(and(eq(products.id, id), eq(products.userId, user.id)))
       .returning();
