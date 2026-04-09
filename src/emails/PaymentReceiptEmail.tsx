@@ -58,11 +58,13 @@ export function PaymentReceiptEmail({
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+    timeZone: 'Asia/Kolkata',
   });
   const formattedTime = paidOn.toLocaleTimeString('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
+    timeZone: 'Asia/Kolkata',
   });
 
   return (
