@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { invoices, PaymentHistoryEntry } from "@/lib/schema";
+import { invoices, customers, PaymentHistoryEntry } from "@/lib/schema";
 import { getOrCreateUser } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
+import { inngest } from "@/inngest/client";
 
 const paymentSchema = z.object({
   additionalPayment: z.number().positive("Payment amount must be greater than zero"),
@@ -45,12 +46,15 @@ export async function PATCH(
     const [inv] = await db
       .select({
         id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
         amount: invoices.amount,
+        currency: invoices.currency,
         paidAmount: invoices.paidAmount,
         paidCash: invoices.paidCash,
         paidOnline: invoices.paidOnline,
         balanceAmount: invoices.balanceAmount,
         paymentHistory: invoices.paymentHistory,
+        customerId: invoices.customerId,
       })
       .from(invoices)
       .where(and(eq(invoices.id, id), eq(invoices.userId, user.id)))
@@ -97,6 +101,48 @@ export async function PATCH(
       })
       .where(and(eq(invoices.id, id), eq(invoices.userId, user.id)))
       .returning();
+
+    // Fetch customer name + email for the event (best-effort)
+    let customerName = 'Customer';
+    let customerEmail: string | null = null;
+    if (inv.customerId) {
+      const [cust] = await db
+        .select({ name: customers.name, email: customers.email })
+        .from(customers)
+        .where(eq(customers.id, inv.customerId))
+        .limit(1);
+      if (cust) {
+        customerName = cust.name;
+        customerEmail = cust.email ?? null;
+      }
+    }
+
+    // Fire Inngest event only if buyer has an email
+    if (customerEmail) {
+      inngest
+        .send({
+          name: 'invoice/payment.recorded',
+          data: {
+            invoiceId: id,
+            invoiceNumber: inv.invoiceNumber ?? '',
+            paymentAmount: additionalPayment,
+            paymentType,
+            paymentReference: paymentReference ?? '',
+            paymentDate: newEntry.paidAt,
+            totalPaid: newPaid,
+            invoiceTotal: totalAmount,
+            balanceRemaining: newBalance,
+            isPaidInFull: isFullyPaid,
+            customerName,
+            customerEmail,
+            businessName: user.businessName ?? user.name ?? 'Business',
+            ownerEmail: user.email,
+            currency: inv.currency ?? 'INR',
+            appUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'https://duemate-opal.vercel.app',
+          },
+        })
+        .catch((err) => console.error('[Inngest] invoice/payment.recorded send failed:', err));
+    }
 
     return NextResponse.json({ success: true, data: updated });
   } catch (err) {

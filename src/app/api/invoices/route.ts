@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { invoices, customers, products } from "@/lib/schema";
 import { getOrCreateUser } from "@/lib/auth";
 import { eq, desc, and, sql } from "drizzle-orm";
+import { inngest } from "@/inngest/client";
 
 const lineItemSchema = z.object({
   productId: z.string(),
@@ -69,6 +70,7 @@ export async function GET() {
         customerId: invoices.customerId,
         customerName: customers.name,
         customerShopName: customers.shopName,
+        customerEmail: customers.email,
       })
       .from(invoices)
       .leftJoin(customers, eq(invoices.customerId, customers.id))
@@ -170,6 +172,71 @@ export async function POST(req: NextRequest) {
             .where(and(eq(products.id, item.productId), eq(products.userId, user.id)))
         )
       );
+    }
+
+    // Fetch customer name + email for the invoice email (best-effort)
+    let customerName = 'Customer';
+    let customerEmail: string | null = null;
+    let customerShopName = '';
+    let customerGstin = '';
+    if (customerId) {
+      const [cust] = await db
+        .select({ name: customers.name, email: customers.email, shopName: customers.shopName, gstin: customers.gstin })
+        .from(customers)
+        .where(eq(customers.id, customerId))
+        .limit(1);
+      if (cust) {
+        customerName = cust.name;
+        customerEmail = cust.email ?? null;
+        customerShopName = cust.shopName ?? '';
+        customerGstin = cust.gstin ?? '';
+      }
+    }
+
+    // Compute display values for the email
+    const subtotal = (extractedData?.lineItems ?? []).reduce(
+      (s, li) => s + li.subtotal,
+      0
+    );
+    const discountAmt =
+      discountType === 'flat'
+        ? discountAmount
+        : subtotal * (discountAmount / 100);
+    const afterDiscount = Math.max(0, subtotal - discountAmt);
+
+    // Fire Inngest event only if we have a buyer email
+    if (customerEmail) {
+      inngest
+        .send({
+          name: 'invoice/created',
+          data: {
+            invoiceId: created.id,
+            invoiceNumber,
+            currency,
+            issueDate,
+            dueDate,
+            // Financial breakdown
+            lineItems: extractedData?.lineItems ?? [],
+            subtotal,
+            discountType,
+            discountAmount,
+            discountAmt,
+            taxRate,
+            taxAmount,
+            total: amount,
+            // Parties
+            customerName,
+            customerShopName,
+            customerGstin,
+            customerEmail,
+            businessName: user.businessName ?? user.name ?? 'Business',
+            ownerName: user.name ?? user.businessName ?? 'Business Owner',
+            ownerEmail: user.email,
+            notes: notes ?? '',
+            appUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'https://duemate-opal.vercel.app',
+          },
+        })
+        .catch((err) => console.error('[Inngest] invoice/created send failed:', err));
     }
 
     return NextResponse.json({ success: true, data: created }, { status: 201 });

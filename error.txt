@@ -1,41 +1,145 @@
-Now update the preview modal totals section to show the breakdown. Find it:
-                                                                                          
-  Searched for 2 patterns (ctrl+o to expand)  
-                                                                                                                                            
-● Update(src\app\dashboard\page.tsx)
-  ⎿  PreToolUse:Edit hook error                                                                                                             
-  ⎿  Added 7 lines, removed 3 lines                                                                                                         
-      1533                  {/* Totals */}                                                                                                  
-      1534                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "16px 20px", background: D.s       
-            urfaceAlt, borderRadius: D.radiusSm, border: `1px solid ${D.borderFaint}` }}>                                                         1535                    {[                                                                                                            
-      1536 +                    { label: "Subtotal", val: subtotal, color: D.textMid, large: false },                                             1537 +                    ...(discountAmt > 0 ? [{ label: `Discount${form.discountType === "percent" ? ` (${form.discountValue}       
-           +%)` : ""}`, val: -discountAmt, color: "#16A34A", large: false }] : []),                                                         
-      1538 +                    ...(discountAmt > 0 ? [{ label: "Taxable Amount", val: afterDiscount, color: D.textMid, large: false        
-           +}] : []),                                                                                                                       
-      1539 +                    ...(taxAmt > 0 ? [{ label: `GST (${form.taxRate}%)`, val: taxAmt, color: D.primary, large: false }] :       
-           + []),                                                                                                                           
-      1540                      { label: "Invoice Total", val: total, color: D.text, large: true },
-      1541                      ...(paidPreview > 0 ? [
-      1542                        { label: `Amount Paid${form.paymentType ? ` (${form.paymentType})` : ""}`, val: paidPreview, color:
-             "#16A34A", large: false },
-      1543                        { label: "Balance Due", val: balancePreview, color: balancePreview > 0 ? "#DC2626" : "#16A34A", lar
-            ge: false },
-      1544                      ] : []),
-      1541 -                  ].map(({ label, val, color, large }) => (                                                              
-      1542 -                    <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}
-           ->                                                                                                                        
-      1545 +                  ].map(({ label, val, color, large }, idx, arr) => (                                                    
-      1546 +                    <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", b
-           +orderTop: label === "Invoice Total" && arr.length > 1 ? `1px solid ${D.borderFaint}` : "none", paddingTop: label === "Inv
-           +oice Total" && arr.length > 1 ? "8px" : 0, marginTop: label === "Invoice Total" && arr.length > 1 ? "4px" : 0 }}>        
-      1547                        <span style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: D.textMid, fontWeight: 500 
-            }}>{label}</span>
-      1548                        <span style={{ fontFamily: "var(--font-display)", fontSize: large ? "1.6rem" : "1.1rem", color, let
-            terSpacing: "0.02em", lineHeight: 1 }}>
-      1545 -                        {currSymbol}{val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-      1549 +                        {val < 0 ? "-" : ""}{currSymbol}{Math.abs(val).toLocaleString("en-IN", { minimumFractionDigits: 2
-           +, maximumFractionDigits: 2 })}                                                                                           
-      1550                        </span>
-      1551                      </div>
-      1552                    ))}
-  ⎿  You've hit your limit · resets 1:30am (Asia/Calcutta)
+Detected additional lockfiles: 
+   * C:\Users\ES\Desktop\2025\duemate\package-lock.json
+
+
+○ Compiling /api/inngest ...
+⨯ Error: "createFunction" expected a handler function as the second argument. Triggers belong in the first argument: createFunction({ id, triggers: { event: "..." } }, handler)
+    at module evaluation (src\inngest\functions.ts:22:52)
+    at module evaluation (src\app\api\inngest\route.ts:3:1)
+    at Object.<anonymous> (C:\Users\ES\Desktop\2025\duemate\.next\dev\server\app\api\inngest\route.js:13:3)
+  20 |
+  21 | /* ── 1. Invoice Created ───────────────────────────────────────────── */
+> 22 | export const notifyOwnerOnInvoiceCreated = inngest.createFunction(
+     |                                                    ^
+  23 |   { id: 'notify-owner-invoice-created' },
+  24 |   { event: 'invoice/created' },
+  25 |   async ({ event, step }) => { {
+  page: '/api/inngest'
+}
+⨯ Error: "createFunction" expected a handler function as the second argument. Triggers belong in the first argument: createFunction({ id, triggers: { event: "..." } }, handler)
+    at module evaluation (src\inngest\functions.ts:22:52)
+    at module evaluation (src\app\api\inngest\route.ts:3:1)
+    at Object.<anonymous> (C:\Users\ES\Desktop\2025\duemate\.next\dev\server\app\api\inngest\route.js:13:3)
+  20 |
+  21 | /* ── 1. Invoice Created ───────────────────────────────────────────── */
+> 22 | export const notifyOwnerOnInvoiceCreated = inngest.createFunction(
+     |                                                    ^
+  23 |   { id: 'notify-owner-invoice-created' },
+  24 |   { event: 'invoice/created' },
+  25 |   async ({ event, step }) => { {
+  page: '/api/inngest'
+}
+○ Compiling /_error ...
+ PUT /api/inngest 500 in 10.9s (next.js: 10.8s, proxy.ts: 42ms, application-code: 65ms)
+⨯ Error: "createFunction" expected a handler function as the second argument. Triggers belong in the first argument: createFunction({ id, triggers: { event: "..." } }, handler)
+    at module evaluation (src\inngest\functions.ts:22:52)
+    at module evaluation (src\app\api\inngest\route.ts:3:1)
+    at Object.<anonymous> (C:\Users\ES\Desktop\2025\duemate\.next\dev\server\app\api\inngest\route.js:13:3)
+  20 |
+  21 | /* ── 1. Invoice Created ───────────────────────────────────────────── */
+> 22 | export const notifyOwnerOnInvoiceCreated = inngest.createFunction(
+     |                                                    ^
+  23 |   { id: 'notify-owner-invoice-created' },
+  24 |   { event: 'invoice/created' },
+  25 |   async ({ event, step }) => { {
+  page: '/api/inngest'
+}
+ PUT /api/inngest 500 in 161ms (next.js: 92ms, proxy.ts: 39ms, application-code: 31ms)
+⨯ Error: "createFunction" expected a handler function as the second argument. Triggers belong in the first argument: createFunction({ id, triggers: { event: "..." } }, handler)
+    at module evaluation (src\inngest\functions.ts:22:52)
+    at module evaluation (src\app\api\inngest\route.ts:3:1)
+    at Object.<anonymous> (C:\Users\ES\Desktop\2025\duemate\.next\dev\server\app\api\inngest\route.js:13:3)
+  20 |
+  21 | /* ── 1. Invoice Created ───────────────────────────────────────────── */
+> 22 | export const notifyOwnerOnInvoiceCreated = inngest.createFunction(
+     |                                                    ^
+  23 |   { id: 'notify-owner-invoice-created' },
+  24 |   { event: 'invoice/created' },
+  25 |   async ({ event, step }) => { {
+  page: '/api/inngest'
+}
+ PUT /api/inngest 500 in 388ms (next.js: 142ms, proxy.ts: 30ms, application-code: 217ms)
+⨯ Error: "createFunction" expected a handler function as the second argument. Triggers belong in the first argument: createFunction({ id, triggers: { event: "..." } }, handler)
+    at module evaluation (src\inngest\functions.ts:22:52)
+    at module evaluation (src\app\api\inngest\route.ts:3:1)
+    at Object.<anonymous> (C:\Users\ES\Desktop\2025\duemate\.next\dev\server\app\api\inngest\route.js:13:3)
+  20 |
+  21 | /* ── 1. Invoice Created ───────────────────────────────────────────── */
+> 22 | export const notifyOwnerOnInvoiceCreated = inngest.createFunction(
+     |                                                    ^
+  23 |   { id: 'notify-owner-invoice-created' },
+  24 |   { event: 'invoice/created' },
+  25 |   async ({ event, step }) => { {
+  page: '/api/inngest'
+}
+ PUT /api/inngest 500 in 126ms (next.js: 80ms, proxy.ts: 25ms, application-code: 21ms)
+⨯ Error: "createFunction" expected a handler function as the second argument. Triggers belong in the first argument: createFunction({ id, triggers: { event: "..." } }, handler)
+    at module evaluation (src\inngest\functions.ts:22:52)
+    at module evaluation (src\app\api\inngest\route.ts:3:1)
+    at Object.<anonymous> (C:\Users\ES\Desktop\2025\duemate\.next\dev\server\app\api\inngest\route.js:13:3)
+  20 |
+  21 | /* ── 1. Invoice Created ───────────────────────────────────────────── */
+> 22 | export const notifyOwnerOnInvoiceCreated = inngest.createFunction(
+     |                                                    ^
+  23 |   { id: 'notify-owner-invoice-created' },
+  24 |   { event: 'invoice/created' },
+  25 |   async ({ event, step }) => { {
+  page: '/api/inngest'
+}
+ PUT /api/inngest 500 in 126ms (next.js: 82ms, proxy.ts: 23ms, application-code: 21ms)
+⨯ Error: "createFunction" expected a handler function as the second argument. Triggers belong in the first argument: createFunction({ id, triggers: { event: "..." } }, handler)
+    at module evaluation (src\inngest\functions.ts:22:52)
+    at module evaluation (src\app\api\inngest\route.ts:3:1)
+    at Object.<anonymous> (C:\Users\ES\Desktop\2025\duemate\.next\dev\server\app\api\inngest\route.js:13:3)
+  20 |
+  21 | /* ── 1. Invoice Created ───────────────────────────────────────────── */
+> 22 | export const notifyOwnerOnInvoiceCreated = inngest.createFunction(
+     |                                                    ^
+  23 |   { id: 'notify-owner-invoice-created' },
+  24 |   { event: 'invoice/created' },
+  25 |   async ({ event, step }) => { {
+  page: '/api/inngest'
+}
+ PUT /api/inngest 500 in 276ms (next.js: 179ms, proxy.ts: 35ms, application-code: 62ms)
+⨯ Error: "createFunction" expected a handler function as the second argument. Triggers belong in the first argument: createFunction({ id, triggers: { event: "..." } }, handler)
+    at module evaluation (src\inngest\functions.ts:22:52)
+    at module evaluation (src\app\api\inngest\route.ts:3:1)
+    at Object.<anonymous> (C:\Users\ES\Desktop\2025\duemate\.next\dev\server\app\api\inngest\route.js:13:3)
+  20 |
+  21 | /* ── 1. Invoice Created ───────────────────────────────────────────── */
+> 22 | export const notifyOwnerOnInvoiceCreated = inngest.createFunction(
+     |                                                    ^
+  23 |   { id: 'notify-owner-invoice-created' },
+  24 |   { event: 'invoice/created' },
+  25 |   async ({ event, step }) => { {
+  page: '/api/inngest'
+}
+ PUT /api/inngest 500 in 213ms (next.js: 162ms, proxy.ts: 29ms, application-code: 23ms)
+⨯ Error: "createFunction" expected a handler function as the second argument. Triggers belong in the first argument: createFunction({ id, triggers: { event: "..." } }, handler)
+    at module evaluation (src\inngest\functions.ts:22:52)
+    at module evaluation (src\app\api\inngest\route.ts:3:1)
+    at Object.<anonymous> (C:\Users\ES\Desktop\2025\duemate\.next\dev\server\app\api\inngest\route.js:13:3)
+  20 |
+  21 | /* ── 1. Invoice Created ───────────────────────────────────────────── */
+> 22 | export const notifyOwnerOnInvoiceCreated = inngest.createFunction(
+     |                                                    ^
+  23 |   { id: 'notify-owner-invoice-created' },
+  24 |   { event: 'invoice/created' },
+  25 |   async ({ event, step }) => { {
+  page: '/api/inngest'
+}
+ PUT /api/inngest 500 in 255ms (next.js: 169ms, proxy.ts: 44ms, application-code: 42ms)
+⨯ Error: "createFunction" expected a handler function as the second argument. Triggers belong in the first argument: createFunction({ id, triggers: { event: "..." } }, handler)
+    at module evaluation (src\inngest\functions.ts:22:52)
+    at module evaluation (src\app\api\inngest\route.ts:3:1)
+    at Object.<anonymous> (C:\Users\ES\Desktop\2025\duemate\.next\dev\server\app\api\inngest\route.js:13:3)
+  20 |
+  21 | /* ── 1. Invoice Created ───────────────────────────────────────────── */
+> 22 | export const notifyOwnerOnInvoiceCreated = inngest.createFunction(
+     |                                                    ^
+  23 |   { id: 'notify-owner-invoice-created' },
+  24 |   { event: 'invoice/created' },
+  25 |   async ({ event, step }) => { {
+  page: '/api/inngest'
+}
+ PUT /api/inngest 500 in 145ms (next.js: 80ms, proxy.ts: 33ms, application-code: 32ms)

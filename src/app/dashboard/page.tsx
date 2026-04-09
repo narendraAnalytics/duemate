@@ -74,6 +74,7 @@ type InvoiceRow = {
   customerId: string | null;
   customerName: string | null;
   customerShopName: string | null;
+  customerEmail: string | null;
 };
 
 type LineItem = {
@@ -1485,6 +1486,7 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
   const [payError, setPayError] = useState("");
   const [printInvoice, setPrintInvoice] = useState<InvoiceRow | null>(null);
   const [lastPaidId, setLastPaidId] = useState<string | null>(null);
+  const [paySuccessEmail, setPaySuccessEmail] = useState<string | null>(null);
 
   async function handleRecordPayment(inv: InvoiceRow) {
     const amt = Number(payDraft.amount);
@@ -1502,6 +1504,7 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
     setPayLoading(false);
     if (json.success) {
       setLastPaidId(inv.id);
+      setPaySuccessEmail(inv.customerEmail ?? null);
       setPayingId(null);
       setPayDraft({ amount: "", type: "cash", reference: "", notes: "" });
       onRefresh();
@@ -1788,14 +1791,22 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
                               );
                             })()}
 
-                            {/* Print Receipt prompt (shown after successful payment) */}
+                            {/* Success banner + Print (shown after successful payment) */}
                             {lastPaidId === inv.id && (
-                              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <span style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: "13px", color: "#16A34A" }}>Payment recorded!</span>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(22,163,74,0.10)", border: "1px solid rgba(22,163,74,0.28)", borderRadius: "8px", padding: "8px 14px" }}>
+                                  <span style={{ fontSize: "15px", color: "#16A34A" }}>✓</span>
+                                  <span style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: "#16A34A" }}>
+                                    Payment recorded
+                                    {paySuccessEmail
+                                      ? <> · Receipt sent to <strong>{paySuccessEmail}</strong></>
+                                      : ""}
+                                  </span>
+                                </div>
                                 <button
                                   type="button"
-                                  onClick={(e) => { e.stopPropagation(); setPrintInvoice(inv); setLastPaidId(null); }}
-                                  style={{ background: D.primaryLight, color: D.primary, border: `1px solid ${D.border}`, borderRadius: "7px", padding: "6px 14px", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                                  onClick={(e) => { e.stopPropagation(); setPrintInvoice(inv); setLastPaidId(null); setPaySuccessEmail(null); }}
+                                  style={{ alignSelf: "flex-start", background: D.primaryLight, color: D.primary, border: `1px solid ${D.border}`, borderRadius: "7px", padding: "6px 14px", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
                                 >
                                   ⎙ Print Receipt
                                 </button>
@@ -1949,7 +1960,7 @@ function SalesSection() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [successEmail, setSuccessEmail] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setFetching(true);
@@ -2055,10 +2066,11 @@ function SalesSection() {
 
     if (json.success) {
       setShowPreview(false);
+      const buyerEmail = selectedCustomer?.email ?? null;
       setForm({ customerId: "", buyerGstin: "", invoiceNumber: genInvoiceNumber(), dueDate: "", currency: "INR", notes: "", discountType: "flat", discountValue: "", taxRate: "", paymentType: "", paidAmount: "" });
       setLineItems([]);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      setSuccessEmail(buyerEmail ?? "");
+      setTimeout(() => setSuccessEmail(null), 5000);
       fetchAll();
     } else {
       setShowPreview(false);
@@ -2780,17 +2792,26 @@ function SalesSection() {
             justifyContent: "flex-end", flexWrap: "wrap", gap: "16px",
             paddingTop: "8px",
           }}>
-            {success && (
-              <motion.span
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
+            {successEmail !== null && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
                 style={{
-                  fontFamily: "var(--font-serif)", fontStyle: "italic",
-                  fontSize: "14px", color: "#16A34A",
+                  display: "flex", alignItems: "center", gap: "8px",
+                  background: "rgba(22,163,74,0.12)",
+                  border: "1px solid rgba(22,163,74,0.3)",
+                  borderRadius: "8px", padding: "8px 14px",
                 }}
               >
-                Invoice created!
-              </motion.span>
+                <span style={{ fontSize: "15px", color: "#16A34A" }}>✓</span>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: "#16A34A" }}>
+                  Invoice created
+                  {successEmail
+                    ? <> · Email sent to <strong>{successEmail}</strong></>
+                    : " successfully"}
+                </span>
+              </motion.div>
             )}
             {error && (
               <span style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: "#DC2626" }}>
