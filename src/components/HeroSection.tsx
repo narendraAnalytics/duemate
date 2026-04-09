@@ -244,7 +244,7 @@ export default function HeroSection() {
             className="flex items-center gap-5 sm:gap-6"
           >
             <Link
-              href="/sign-up"
+              href={isSignedIn ? "/dashboard" : "/sign-up"}
               className="group flex items-center gap-3 font-semibold text-sm sm:text-base tracking-wide"
               style={{ color: "var(--color-text)" }}
             >
