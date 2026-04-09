@@ -1353,7 +1353,9 @@ function PrintInvoiceModal({ inv, onClose }: { inv: InvoiceRow; onClose: () => v
               <p style={{ fontSize: "10px", fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.09em", textTransform: "uppercase" }}>Invoice No.</p>
               <p style={{ fontSize: "18px", fontWeight: 700, color: "#5B5EF4", letterSpacing: "0.02em" }}>{inv.invoiceNumber ?? "—"}</p>
               <p style={{ fontSize: "11px", color: "#9CA3AF", marginTop: "4px" }}>
-                Status: <span style={{ fontWeight: 700, color: inv.status === "paid" ? "#16A34A" : inv.status === "overdue" ? "#DC2626" : "#D97706", textTransform: "capitalize" }}>{inv.status.replace("_", " ")}</span>
+                Status: <span style={{ fontWeight: 700, color: paid === 0 ? "#DC2626" : balance <= 0.001 ? "#16A34A" : "#D97706" }}>
+                  {paid === 0 ? "Unpaid" : balance <= 0.001 ? "Paid" : "Partial"}
+                </span>
               </p>
             </div>
           </div>

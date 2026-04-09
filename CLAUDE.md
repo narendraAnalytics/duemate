@@ -47,8 +47,8 @@ npx tsc --noEmit       # Type-check without building
 
 ### AI + Automation
 - **Gemini 3.1 Flash-Lite Preview** — model string: `gemini-3.1-flash-lite-preview`. Do NOT use `gemini-2.0-flash` (shuts down June 1, 2026).
-- Inngest — 3 durable background functions *(not yet implemented)*
-- Resend + React Email — transactional email
+- Inngest — 3 durable background functions (**fully implemented**)
+- Resend + React Email — transactional email (**3 templates fully implemented**)
 - Meta WhatsApp Cloud API (direct, no Twilio, no BSP markup)
 
 ### Infrastructure
@@ -167,6 +167,12 @@ All routes call `getOrCreateUser()` first, validate with Zod, return `{ success,
 | `src/components/Navbar.tsx` | Menu, scramble animation, slide-in panel, auth guard |
 | `src/components/HeroSection.tsx` | Video hero, flip transition, welcome overlay |
 | `src/components/CustomCursor.tsx` | Spring-physics custom cursor |
+| `src/inngest/client.ts` | Inngest client (`id: 'duemate'`) |
+| `src/inngest/functions.ts` | 3 background functions (invoice created, payment recorded, overdue cron) |
+| `src/app/api/inngest/route.ts` | Inngest webhook handler — serves all 3 functions |
+| `src/emails/InvoiceCreatedEmail.tsx` | Invoice notification email template |
+| `src/emails/PaymentReceiptEmail.tsx` | Payment receipt email template |
+| `src/emails/PaymentDueReminderEmail.tsx` | Daily overdue reminder email template |
 | `next.config.ts` | Cloudinary image domain whitelist |
 
 ## Coding Standards
@@ -179,22 +185,46 @@ All routes call `getOrCreateUser()` first, validate with Zod, return `{ success,
 - Buttons outside `<form>` must have `type="button"`
 - No `twilio` package anywhere
 
-## Gemini *(not yet implemented)*
+## Inngest — 3 Functions (fully implemented)
+
+Client: `src/inngest/client.ts` — `new Inngest({ id: 'duemate' })`
+Route: `src/app/api/inngest/route.ts` — `serve()` handler (GET, POST, PUT)
+Functions: `src/inngest/functions.ts`
+
+**Local dev:** `INNGEST_DEV=1` must be in `.env` locally (Inngest CLI at port 8288). Do NOT set `INNGEST_DEV` on Vercel.
+**Production sync:** After deploying, register `https://<your-domain>/api/inngest` in Inngest Cloud (app.inngest.com → Apps → Sync).
+
+| Function ID | Trigger | Action |
+|---|---|---|
+| `notify-owner-invoice-created` | event `invoice/created` | Sends `InvoiceCreatedEmail` to buyer via Resend |
+| `notify-owner-payment-recorded` | event `invoice/payment.recorded` | Sends `PaymentReceiptEmail` to buyer via Resend |
+| `check-overdue-invoices` | cron `30 5 * * *` (11:00 AM IST) | Marks pending→overdue; sends `PaymentDueReminderEmail` per buyer (grouped by customerId) |
+
+Events are fired **non-blocking** from API routes: `inngest.send({...}).catch(...)` — email failure never breaks the API response. Events are skipped silently if the buyer has no email.
+
+## Email Templates (fully implemented)
+
+All in `src/emails/`, using `@react-email/components`. Owner is always `replyTo`; buyer is always `to`.
+
+| File | Theme | Sections |
+|---|---|---|
+| `InvoiceCreatedEmail.tsx` | Indigo/light (`#EEF2FF`) | Header, Bill To (name + shop + GSTIN), dates, line items table, totals, notes, thank you |
+| `PaymentReceiptEmail.tsx` | Green (`#F0FDF4`) | Header, status banner (PAID/PARTIAL), payment details (mode/date/time/ref), account summary, thank you |
+| `PaymentDueReminderEmail.tsx` | Amber (`#FFFBEB`) | Header, alert, invoice table with overdue badges, incentive ("💰 Pay on time & save"), new stock teaser, warm close |
+
+`PaymentDueReminderEmail` `OverdueInvoice` interface: `{ invoiceNumber, amount, daysOverdue, dueDate (ISO), currency? }` — badge is red if `daysOverdue > 7`, amber if ≤7.
+
+## Gemini *(not yet implemented — file does not exist)*
 - Model: `gemini-3.1-flash-lite-preview`
 - Config: `responseMimeType: 'application/json'`, `temperature: 0.1`
-- File: `src/lib/gemini.ts` → `extractInvoiceData(fileBase64, mimeType)`
+- File to create: `src/lib/gemini.ts` → `extractInvoiceData(fileBase64, mimeType)`
 
-## Inngest — 3 Functions *(not yet implemented)*
-1. **notifyOwner** — event: `invoice/created`, immediate confirmation email to invoice owner
-2. **scheduleReminders** — event: `invoice/created`, `step.sleepUntil()` for up to 7 reminder slots
-3. **checkOverdue** — cron: `0 9 * * *`, marks pending past-due invoices as overdue
-
-## WhatsApp *(not yet implemented)*
+## WhatsApp *(not yet implemented — file does not exist)*
 - Provider: Meta WhatsApp Cloud API — **NOT Twilio**
 - Endpoint: `https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages`
 - Auth: Bearer `META_WHATSAPP_ACCESS_TOKEN`
 - Template: `payment_reminder` (UTILITY — must be Meta-approved)
-- File: `src/lib/whatsapp.ts` → `sendWhatsAppReminder()`
+- File to create: `src/lib/whatsapp.ts` → `sendWhatsAppReminder()`
 
 ## Environment Variables
 Stored in `.env` at project root (not `.env.local`). Add to Vercel dashboard manually — never committed.
