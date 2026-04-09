@@ -64,6 +64,7 @@ export async function GET() {
         paymentNotes: invoices.paymentNotes,
         notes: invoices.notes,
         extractedData: invoices.extractedData,
+        paymentHistory: invoices.paymentHistory,
         createdAt: invoices.createdAt,
         customerId: invoices.customerId,
         customerName: customers.name,
@@ -153,6 +154,9 @@ export async function POST(req: NextRequest) {
         status: invoiceStatus,
         paidAt,
         extractedData: extractedData ?? null,
+        paymentHistory: (paidAmount > 0 && paymentType)
+          ? [{ amount: paidAmount, type: paymentType as "cash" | "online", reference: "", notes: "", paidAt: new Date().toISOString() }]
+          : [],
       })
       .returning();
 

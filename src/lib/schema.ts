@@ -93,6 +93,16 @@ export const products = pgTable("products", {
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 
+// ─── Payment History ───────────────────────────────────────────────────────────
+
+export type PaymentHistoryEntry = {
+  amount: number;
+  type: "cash" | "online";
+  reference: string;
+  notes: string;
+  paidAt: string; // ISO 8601
+};
+
 // ─── Invoices ─────────────────────────────────────────────────────────────────
 
 export const invoices = pgTable("invoices", {
@@ -124,6 +134,7 @@ export const invoices = pgTable("invoices", {
   paymentNotes: text("payment_notes"),
   notes: text("notes"),
   extractedData: jsonb("extracted_data"),      // stores line items array
+  paymentHistory: jsonb("payment_history").$type<PaymentHistoryEntry[]>().default([]),
   fileUrl: text("file_url"),                   // future: uploaded invoice PDF
   aiConfidence: real("ai_confidence"),         // future: AI extraction confidence
   createdAt: timestamp("created_at").defaultNow().notNull(),

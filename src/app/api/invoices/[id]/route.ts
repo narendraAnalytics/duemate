@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { invoices } from "@/lib/schema";
+import { invoices, PaymentHistoryEntry } from "@/lib/schema";
 import { getOrCreateUser } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 
@@ -33,6 +33,14 @@ export async function PATCH(
 
     const { additionalPayment, paymentType, paymentReference, paymentNotes } = parsed.data;
 
+    const newEntry: PaymentHistoryEntry = {
+      amount: additionalPayment,
+      type: paymentType,
+      reference: paymentReference ?? "",
+      notes: paymentNotes ?? "",
+      paidAt: new Date().toISOString(),
+    };
+
     // Fetch current invoice (must belong to this user)
     const [inv] = await db
       .select({
@@ -42,6 +50,7 @@ export async function PATCH(
         paidCash: invoices.paidCash,
         paidOnline: invoices.paidOnline,
         balanceAmount: invoices.balanceAmount,
+        paymentHistory: invoices.paymentHistory,
       })
       .from(invoices)
       .where(and(eq(invoices.id, id), eq(invoices.userId, user.id)))
@@ -68,6 +77,9 @@ export async function PATCH(
     const newBalance = Math.max(0, totalAmount - newPaid);
     const isFullyPaid = newBalance <= 0.001;
 
+    const existingHistory: PaymentHistoryEntry[] = Array.isArray(inv.paymentHistory) ? inv.paymentHistory : [];
+    const updatedHistory = [...existingHistory, newEntry];
+
     const [updated] = await db
       .update(invoices)
       .set({
@@ -81,6 +93,7 @@ export async function PATCH(
         lastPaymentAt: new Date(),
         ...(paymentReference ? { paymentReference } : {}),
         ...(paymentNotes !== undefined ? { paymentNotes: paymentNotes || null } : {}),
+        paymentHistory: updatedHistory,
       })
       .where(and(eq(invoices.id, id), eq(invoices.userId, user.id)))
       .returning();

@@ -38,6 +38,14 @@ type Tab = "customers" | "products" | "sales";
 
 type InvoiceStatus = "pending" | "due_soon" | "overdue" | "paid" | "cancelled";
 
+type PaymentHistoryEntry = {
+  amount: number;
+  type: "cash" | "online";
+  reference: string;
+  notes: string;
+  paidAt: string;
+};
+
 type InvoiceRow = {
   id: string;
   invoiceNumber: string | null;
@@ -61,6 +69,7 @@ type InvoiceRow = {
   taxRate: string | null;
   taxAmount: string | null;
   extractedData: { lineItems: LineItem[] } | null;
+  paymentHistory: PaymentHistoryEntry[] | null;
   createdAt: string;
   customerId: string | null;
   customerName: string | null;
@@ -1273,6 +1282,199 @@ function ProductsSection() {
   );
 }
 
+// ─── Print Invoice Modal ──────────────────────────────────────────────────────
+
+function PrintInvoiceModal({ inv, onClose }: { inv: InvoiceRow; onClose: () => void }) {
+  const sym = inv.currency === "USD" ? "$" : inv.currency === "EUR" ? "€" : "₹";
+  const lineItems = (inv.extractedData as { lineItems?: LineItem[] } | null)?.lineItems ?? [];
+  const history = (inv.paymentHistory ?? []) as PaymentHistoryEntry[];
+  const paidCash = Number(inv.paidCash ?? 0);
+  const paidOnline = Number(inv.paidOnline ?? 0);
+  const subtotal = lineItems.reduce((s, li) => s + Number(li.subtotal), 0);
+  const discountAmt = Number(inv.discountAmount ?? 0);
+  const taxAmt = Number(inv.taxAmount ?? 0);
+  const total = Number(inv.amount ?? 0);
+  const balance = Number(inv.balanceAmount ?? 0);
+  const paid = Number(inv.paidAmount ?? 0);
+
+  function handlePrint() {
+    const content = document.getElementById("duemate-print-body");
+    if (!content) return;
+    const win = window.open("", "_blank", "width=860,height=960");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head>
+      <title>Invoice ${inv.invoiceNumber ?? ""}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, -apple-system, sans-serif; color: #1C1B2E; padding: 24px 32px; background: white; }
+        @page { margin: 14mm; size: A4 portrait; }
+        @media print { body { padding: 0; } }
+      </style>
+    </head><body>${content.innerHTML}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 350);
+  }
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(7,10,18,0.72)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: "#FFFFFF", borderRadius: "14px", boxShadow: "0 24px 64px rgba(0,0,0,0.3)", width: "100%", maxWidth: "700px", maxHeight: "92svh", overflowY: "auto", display: "flex", flexDirection: "column" }}>
+
+        {/* Toolbar */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 28px", borderBottom: "1px solid rgba(0,0,0,0.07)", position: "sticky", top: 0, background: "#FFFFFF", zIndex: 1 }}>
+          <div>
+            <p style={{ fontFamily: "var(--font-body)", fontWeight: 700, color: "#1C1B2E", fontSize: "14px" }}>{inv.invoiceNumber ?? "Invoice"}</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: "11px", color: "#9CA3AF", marginTop: "1px" }}>{inv.customerName} {inv.customerShopName ? `· ${inv.customerShopName}` : ""}</p>
+          </div>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button type="button" onClick={handlePrint} style={{ background: "#5B5EF4", color: "#fff", border: "none", borderRadius: "8px", padding: "8px 20px", fontFamily: "var(--font-body)", fontSize: "13px", fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(91,94,244,0.35)" }}>
+              ⎙ Print
+            </button>
+            <button type="button" onClick={onClose} style={{ background: "#FAF8F4", color: "#6B7280", border: "1px solid rgba(0,0,0,0.08)", borderRadius: "8px", padding: "8px 16px", fontFamily: "var(--font-body)", fontSize: "13px", cursor: "pointer" }}>
+              Close
+            </button>
+          </div>
+        </div>
+
+        {/* Printable body */}
+        <div id="duemate-print-body" style={{ padding: "36px 44px", display: "flex", flexDirection: "column", gap: "24px" }}>
+
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <p style={{ fontSize: "22px", fontWeight: 800, color: "#1C1B2E", letterSpacing: "0.04em" }}>DueMate</p>
+              <p style={{ fontSize: "11px", color: "#9CA3AF", marginTop: "3px" }}>Tax Invoice</p>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <p style={{ fontSize: "10px", fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.09em", textTransform: "uppercase" }}>Invoice No.</p>
+              <p style={{ fontSize: "18px", fontWeight: 700, color: "#5B5EF4", letterSpacing: "0.02em" }}>{inv.invoiceNumber ?? "—"}</p>
+              <p style={{ fontSize: "11px", color: "#9CA3AF", marginTop: "4px" }}>
+                Status: <span style={{ fontWeight: 700, color: inv.status === "paid" ? "#16A34A" : inv.status === "overdue" ? "#DC2626" : "#D97706", textTransform: "capitalize" }}>{inv.status.replace("_", " ")}</span>
+              </p>
+            </div>
+          </div>
+
+          <div style={{ height: "1px", background: "rgba(0,0,0,0.08)" }} />
+
+          {/* Dates */}
+          <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
+            {[
+              { label: "Issue Date", val: inv.issueDate ? new Date(inv.issueDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—" },
+              { label: "Due Date", val: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—" },
+              { label: "Created", val: new Date(inv.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) },
+            ].map(({ label, val }) => (
+              <div key={label}>
+                <p style={{ fontSize: "10px", fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: "3px" }}>{label}</p>
+                <p style={{ fontWeight: 600, fontSize: "13px", color: "#1C1B2E" }}>{val}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Bill To */}
+          <div style={{ background: "#FAF8F4", borderRadius: "8px", padding: "14px 18px", border: "1px solid rgba(0,0,0,0.06)" }}>
+            <p style={{ fontSize: "10px", fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: "8px" }}>Bill To</p>
+            <p style={{ fontWeight: 700, fontSize: "15px", color: "#1C1B2E" }}>{inv.customerName ?? "—"}</p>
+            {inv.customerShopName && <p style={{ fontSize: "13px", color: "#D97706", marginTop: "3px" }}>{inv.customerShopName}</p>}
+          </div>
+
+          {/* Line Items */}
+          {lineItems.length > 0 && (
+            <div style={{ border: "1px solid rgba(0,0,0,0.08)", borderRadius: "8px", overflow: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 60px 110px 110px", padding: "8px 14px", background: "#FAF8F4", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+                {["Product", "Qty", "Rate", "Subtotal"].map((h, i) => (
+                  <span key={h} style={{ fontSize: "10px", fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.09em", textTransform: "uppercase", textAlign: i > 0 ? "right" as const : "left" as const }}>{h}</span>
+                ))}
+              </div>
+              {lineItems.map((li, idx) => (
+                <div key={idx} style={{ display: "grid", gridTemplateColumns: "2fr 60px 110px 110px", padding: "10px 14px", borderBottom: idx < lineItems.length - 1 ? "1px solid rgba(0,0,0,0.04)" : "none", background: idx % 2 === 0 ? "#fff" : "rgba(244,240,232,0.3)" }}>
+                  <div>
+                    <p style={{ fontWeight: 600, fontSize: "13px", color: "#1C1B2E" }}>{li.name}</p>
+                    {li.unit && <p style={{ fontSize: "11px", color: "#9CA3AF" }}>{li.unit}</p>}
+                  </div>
+                  <p style={{ fontSize: "13px", color: "#6B7280", textAlign: "right" }}>{li.quantity}</p>
+                  <p style={{ fontSize: "13px", color: "#D97706", fontWeight: 600, textAlign: "right" }}>{sym}{Number(li.rate).toLocaleString("en-IN")}</p>
+                  <p style={{ fontSize: "13px", color: "#1C1B2E", fontWeight: 700, textAlign: "right" }}>{sym}{Number(li.subtotal).toLocaleString("en-IN")}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Financials */}
+          <div style={{ alignSelf: "flex-end", minWidth: "280px", display: "flex", flexDirection: "column", gap: "6px", padding: "14px 18px", background: "#FAF8F4", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.06)" }}>
+            {[
+              { label: "Subtotal", val: subtotal, show: true, color: "#6B7280" },
+              { label: "Discount", val: -discountAmt, show: discountAmt > 0, color: "#16A34A" },
+              { label: `GST (${inv.taxRate ?? 0}%)`, val: taxAmt, show: taxAmt > 0, color: "#5B5EF4" },
+              { label: "Invoice Total", val: total, show: true, bold: true, color: "#1C1B2E", divider: true },
+              { label: "Paid (Cash)", val: paidCash, show: paidCash > 0, color: "#16A34A" },
+              { label: "Paid (Online)", val: paidOnline, show: paidOnline > 0, color: "#16A34A" },
+              { label: "Balance Due", val: balance, show: paid > 0, bold: balance > 0, color: balance > 0 ? "#DC2626" : "#16A34A" },
+            ].filter(r => r.show).map(({ label, val, bold, color, divider }) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: divider ? "1px solid rgba(0,0,0,0.08)" : "none", paddingTop: divider ? "6px" : 0, marginTop: divider ? "4px" : 0 }}>
+                <span style={{ fontSize: "12px", color: "#9CA3AF" }}>{label}</span>
+                <span style={{ fontSize: bold ? "1.15rem" : "0.93rem", fontWeight: bold ? 700 : 600, color }}>
+                  {val < 0 ? "-" : ""}{sym}{Math.abs(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Payment History */}
+          {history.length > 0 && (
+            <div>
+              <p style={{ fontSize: "10px", fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: "10px" }}>
+                Payment History — {history.length} payment{history.length !== 1 ? "s" : ""}
+              </p>
+              <div style={{ border: "1px solid rgba(0,0,0,0.08)", borderRadius: "8px", overflow: "hidden" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1.4fr 90px 70px 1fr", padding: "8px 14px", background: "#FAF8F4", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+                  {["Date & Time", "Amount", "Mode", "Ref / Notes"].map((h) => (
+                    <span key={h} style={{ fontSize: "10px", fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.08em", textTransform: "uppercase" }}>{h}</span>
+                  ))}
+                </div>
+                {history.map((entry, idx) => (
+                  <div key={idx} style={{ display: "grid", gridTemplateColumns: "1.4fr 90px 70px 1fr", padding: "10px 14px", alignItems: "center", borderBottom: idx < history.length - 1 ? "1px solid rgba(0,0,0,0.04)" : "none", background: idx % 2 === 0 ? "#fff" : "rgba(244,240,232,0.3)" }}>
+                    <p style={{ fontSize: "12px", color: "#6B7280" }}>
+                      {new Date(entry.paidAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                    <p style={{ fontSize: "13px", fontWeight: 700, color: "#16A34A" }}>
+                      {sym}{Number(entry.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p style={{ fontSize: "12px", fontWeight: 600, color: entry.type === "cash" ? "#D97706" : "#5B5EF4", textTransform: "capitalize" }}>
+                      {entry.type}
+                    </p>
+                    <p style={{ fontSize: "11px", color: "#5B5EF4", letterSpacing: "0.03em" }}>
+                      {[entry.reference, entry.notes].filter(Boolean).join(" · ") || "—"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Invoice Notes */}
+          {inv.notes && (
+            <div>
+              <p style={{ fontSize: "10px", fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: "6px" }}>Notes</p>
+              <p style={{ fontSize: "13px", color: "#6B7280", lineHeight: 1.6 }}>{inv.notes}</p>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: "18px", textAlign: "center" }}>
+            <p style={{ fontStyle: "italic", fontSize: "12px", color: "#9CA3AF" }}>
+              Generated by DueMate · {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Invoice List (expandable rows) ──────────────────────────────────────────
 
 function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: InvoiceRow[]; fetching: boolean; onRefresh: () => void }) {
@@ -1281,6 +1483,8 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
   const [payDraft, setPayDraft] = useState({ amount: "", type: "cash" as "cash" | "online", reference: "", notes: "" });
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState("");
+  const [printInvoice, setPrintInvoice] = useState<InvoiceRow | null>(null);
+  const [lastPaidId, setLastPaidId] = useState<string | null>(null);
 
   async function handleRecordPayment(inv: InvoiceRow) {
     const amt = Number(payDraft.amount);
@@ -1297,6 +1501,7 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
     const json = await res.json();
     setPayLoading(false);
     if (json.success) {
+      setLastPaidId(inv.id);
       setPayingId(null);
       setPayDraft({ amount: "", type: "cash", reference: "", notes: "" });
       onRefresh();
@@ -1325,9 +1530,9 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
       ) : (
         <div style={{ background: "#FFFFFF", borderRadius: "14px", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.06)", overflow: "hidden" }}>
           {/* Header */}
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.5fr 1fr 1fr 1fr 1fr 28px", padding: "12px 20px", background: "#FAF8F4", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
-            {["Invoice #", "Buyer", "Total", "Paid", "Balance", "Payment", ""].map((h) => (
-              <span key={h} style={{ fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.09em", textTransform: "uppercase" }}>{h}</span>
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.5fr 1fr 1fr 1fr 1fr 32px 28px", padding: "12px 20px", background: "#FAF8F4", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+            {["Invoice #", "Buyer", "Total", "Paid", "Balance", "Payment", "Print", "Expand"].map((h) => (
+              <span key={h} style={{ fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.09em", textTransform: "uppercase" }}></span>
             ))}
           </div>
 
@@ -1367,7 +1572,7 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.04 }}
                   style={{
-                    display: "grid", gridTemplateColumns: "1.2fr 1.5fr 1fr 1fr 1fr 1fr 28px",
+                    display: "grid", gridTemplateColumns: "1.2fr 1.5fr 1fr 1fr 1fr 1fr 32px 28px",
                     padding: "14px 20px", alignItems: "center",
                     background: isOpen ? "rgba(91,94,244,0.03)" : i % 2 === 0 ? "#FFFFFF" : "rgba(244,240,232,0.4)",
                     cursor: "pointer", transition: "background 0.15s",
@@ -1406,6 +1611,14 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
                     <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: payBadge.color, flexShrink: 0 }} />
                     <span style={{ fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 600, color: payBadge.color }}>{payBadge.label}</span>
                   </span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setPrintInvoice(inv); }}
+                    title="Print Invoice"
+                    style={{ background: "none", border: "none", cursor: "pointer", color: D.textFaint, fontSize: "15px", padding: "2px", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, borderRadius: "4px" }}
+                  >
+                    ⎙
+                  </button>
                   <span style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: "#9CA3AF", textAlign: "center", userSelect: "none" }}>
                     {isOpen ? "▲" : "▼"}
                   </span>
@@ -1532,6 +1745,63 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
                               ))}
                             </div>
 
+                            {/* Payment History */}
+                            {(() => {
+                              const history = (inv.paymentHistory ?? []) as PaymentHistoryEntry[];
+                              if (history.length === 0) return null;
+                              return (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                  <p style={{ fontFamily: "var(--font-body)", fontSize: "10px", fontWeight: 700, color: D.textFaint, letterSpacing: "0.09em", textTransform: "uppercase" }}>
+                                    Payment History ({history.length})
+                                  </p>
+                                  <div style={{ border: "1px solid rgba(0,0,0,0.06)", borderRadius: "8px", overflow: "hidden" }}>
+                                    {history.map((entry, idx) => (
+                                      <div key={idx} style={{ display: "flex", gap: "10px", alignItems: "flex-start", padding: "10px 14px", background: idx % 2 === 0 ? "#FFFFFF" : "rgba(244,240,232,0.4)", borderBottom: idx < history.length - 1 ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
+                                        <div style={{ paddingTop: "4px", flexShrink: 0 }}>
+                                          <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: entry.type === "cash" ? D.amber : D.primary }} />
+                                        </div>
+                                        <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+                                          <div>
+                                            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                              <span style={{ fontFamily: "var(--font-body)", fontSize: "13px", fontWeight: 700, color: D.text }}>
+                                                {sym}{Number(entry.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                              </span>
+                                              <span style={{ background: entry.type === "cash" ? D.amberLight : D.primaryLight, color: entry.type === "cash" ? D.amber : D.primary, border: `1px solid ${entry.type === "cash" ? "rgba(217,119,6,0.25)" : D.border}`, borderRadius: "20px", padding: "1px 8px", fontFamily: "var(--font-body)", fontSize: "10px", fontWeight: 600, textTransform: "capitalize" }}>
+                                                {entry.type}
+                                              </span>
+                                            </div>
+                                            {entry.reference && (
+                                              <p style={{ fontFamily: "var(--font-body)", fontSize: "11px", color: D.primary, marginTop: "3px", letterSpacing: "0.04em" }}>Ref: {entry.reference}</p>
+                                            )}
+                                            {entry.notes && (
+                                              <p style={{ fontFamily: "var(--font-body)", fontSize: "11px", color: D.textMid, marginTop: "2px" }}>{entry.notes}</p>
+                                            )}
+                                          </div>
+                                          <p style={{ fontFamily: "var(--font-body)", fontSize: "11px", color: D.textFaint, flexShrink: 0, textAlign: "right" }}>
+                                            {new Date(entry.paidAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
+                            {/* Print Receipt prompt (shown after successful payment) */}
+                            {lastPaidId === inv.id && (
+                              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                <span style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: "13px", color: "#16A34A" }}>Payment recorded!</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setPrintInvoice(inv); setLastPaidId(null); }}
+                                  style={{ background: D.primaryLight, color: D.primary, border: `1px solid ${D.border}`, borderRadius: "7px", padding: "6px 14px", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                                >
+                                  ⎙ Print Receipt
+                                </button>
+                              </div>
+                            )}
+
                             {/* Record Payment */}
                             {isPayable && !isRecording && (
                               <div>
@@ -1610,6 +1880,9 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
             );
           })}
         </div>
+      )}
+      {printInvoice && (
+        <PrintInvoiceModal inv={printInvoice} onClose={() => setPrintInvoice(null)} />
       )}
     </div>
   );
