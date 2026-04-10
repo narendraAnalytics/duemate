@@ -2847,7 +2847,6 @@ function SalesSection() {
   );
 }
 
-// ─── Dashboard Page ───────────────────────────────────────────────────────────
 
 const TABS: { id: Tab; label: string; numeral: string }[] = [
   { id: "customers", label: "Buyers", numeral: "I" },

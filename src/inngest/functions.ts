@@ -69,6 +69,7 @@ export const checkOverdueInvoices = inngest.createFunction(
           id: invoices.id,
           invoiceNumber: invoices.invoiceNumber,
           amount: invoices.amount,
+          balanceAmount: invoices.balanceAmount,
           currency: invoices.currency,
           dueDate: invoices.dueDate,
           userId: invoices.userId,
@@ -119,7 +120,7 @@ export const checkOverdueInvoices = inngest.createFunction(
       };
       entry.invoices.push({
         invoiceNumber: row.invoiceNumber ?? '',
-        amount: Number(row.amount ?? 0),
+        amount: Number(row.balanceAmount ?? row.amount ?? 0),
         daysOverdue,
         dueDate: dueDate.toISOString(),
         currency: row.currency ?? 'INR',

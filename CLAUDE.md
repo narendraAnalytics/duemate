@@ -86,10 +86,11 @@ Schema: `src/lib/schema.ts` | Client: `src/lib/db.ts` (Neon HTTP driver) | Confi
 - **users** — Clerk userId (text PK), email, name, businessName, plan (free/starter/pro), timezone
 - **customers** — uuid PK, userId FK, name, email (required), shopName (required), phone, gstin (15-char GSTIN format)
 - **products** — uuid PK, userId FK, name, description, rate (selling price), unit, quantity (stock), gstRate, purchaseRate, purchaseDate, supplierShop, supplierPhone, supplierGstin, hsnCode
-- **invoices** — uuid PK, userId FK, customerId FK, invoiceNumber, amount, currency, dueDate, issueDate, status (pending/due_soon/overdue/paid/cancelled), discountType/discountAmount, taxRate/taxAmount, paymentType, paidAmount, balanceAmount, paidAt, lastPaymentAt, paymentReference, notes, extractedData (jsonb — stores line items array), fileUrl, aiConfidence
+- **invoices** — uuid PK, userId FK, customerId FK, invoiceNumber, amount, currency, dueDate, issueDate, status (pending/due_soon/overdue/paid/cancelled), discountType/discountAmount, taxRate/taxAmount, paymentType, paidAmount, paidCash, paidOnline, balanceAmount, paidAt, lastPaymentAt, paymentReference, paymentNotes, notes, extractedData (jsonb — stores line items array), paymentHistory (jsonb array of `{amount, type, reference, notes, paidAt}`), fileUrl, aiConfidence
 - **reminders** — uuid PK, invoiceId FK, type, channel (email/whatsapp/both), scheduledAt, sentAt, status, messageBody, error
 - **reminder_settings** — uuid PK, userId FK (unique), 7 boolean timing toggles (day30/14/7/3/1, dueDay, overdue), emailEnabled, whatsappEnabled, customMessage, senderName
 - **notifications** — audit log, uuid PK, userId FK, reminderId FK, channel, recipient, subject, status (delivered/bounced/failed/read), externalId, sentAt
+*(zoho_integrations table — not yet created in schema; needed when Zoho integration is implemented)*
 
 ### Dynamic Route Params — Next.js 15
 In `[id]` API routes, `params` is a **Promise** and must be awaited:
@@ -144,7 +145,7 @@ All routes call `getOrCreateUser()` first, validate with Zod, return `{ success,
 | `/api/products` | GET, POST | List / create products |
 | `/api/products/[id]` | PATCH | Update product + stock |
 | `/api/invoices` | GET, POST | List (with customer join) / create invoices |
-| `/api/invoices/[id]` | PATCH | Record payment — adds `additionalPayment` to `paidAmount`, sets `lastPaymentAt`, optionally stores `paymentReference`. Sets status to `"paid"` when balance reaches zero. |
+| `/api/invoices/[id]` | PATCH | Record payment — adds `additionalPayment` to `paidAmount`/`paidCash`/`paidOnline`, appends to `paymentHistory`, sets `lastPaymentAt`, optionally stores `paymentReference`/`paymentNotes`. Sets status to `"paid"` when balance reaches zero. |
 
 ## Key File Paths
 | File | Purpose |
@@ -163,7 +164,7 @@ All routes call `getOrCreateUser()` first, validate with Zod, return `{ success,
 | `src/app/api/products/route.ts` | Products list + create |
 | `src/app/api/products/[id]/route.ts` | Product PATCH |
 | `src/app/api/invoices/route.ts` | Invoices list (left-joins customers) + create |
-| `src/app/api/invoices/[id]/route.ts` | Invoice payment PATCH |
+| `src/app/api/invoices/[id]/route.ts` | Invoice payment PATCH — updates paidCash/paidOnline split, appends paymentHistory entry |
 | `src/components/Navbar.tsx` | Menu, scramble animation, slide-in panel, auth guard |
 | `src/components/HeroSection.tsx` | Video hero, flip transition, welcome overlay |
 | `src/components/CustomCursor.tsx` | Spring-physics custom cursor |
@@ -214,6 +215,19 @@ All in `src/emails/`, using `@react-email/components`. Owner is always `replyTo`
 
 `PaymentDueReminderEmail` `OverdueInvoice` interface: `{ invoiceNumber, amount, daysOverdue, dueDate (ISO), currency? }` — badge is red if `daysOverdue > 7`, amber if ≤7.
 
+## Zoho Books Integration *(not yet implemented — files do not exist)*
+
+OAuth 2.0 flow using Zoho India endpoints (`accounts.zoho.in`, `zohoapis.in`). Tokens to be stored in `zoho_integrations` table (not yet in schema).
+
+Files to create:
+- `src/lib/zoho.ts` → `syncInvoiceToZoho()` — OAuth token refresh + contact lookup/create + invoice create
+- `src/app/api/integrations/zoho/connect/route.ts` — redirect to Zoho consent screen
+- `src/app/api/integrations/zoho/callback/route.ts` — exchange code for tokens, upsert `zoho_integrations`
+- `src/app/api/integrations/zoho/status/route.ts` — returns `{ connected, connectedAt }`
+- `src/app/api/integrations/zoho/disconnect/route.ts` — deletes the row
+
+**Scopes required:** `ZohoInvoice.invoices.CREATE`, `ZohoInvoice.contacts.CREATE`, `ZohoInvoice.contacts.READ`
+
 ## Gemini *(not yet implemented — file does not exist)*
 - Model: `gemini-3.1-flash-lite-preview`
 - Config: `responseMimeType: 'application/json'`, `temperature: 0.1`
@@ -236,6 +250,7 @@ Stored in `.env` at project root (not `.env.local`). Add to Vercel dashboard man
 - **Meta WhatsApp**: `META_WHATSAPP_ACCESS_TOKEN`, `META_WHATSAPP_PHONE_NUMBER_ID`, `META_WHATSAPP_BUSINESS_ACCOUNT_ID`, `META_APP_ID`, `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`
 - **Inngest**: `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`
 - **ImageKit**: `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT`
+- **Zoho Books**: `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REDIRECT_URI` (must match OAuth app config), `ZOHO_ORG_ID` (Zoho Books organization ID — avoids needing settings.READ scope)
 - **App**: `NEXT_PUBLIC_APP_URL`
 
 ## Pricing Tiers
@@ -246,5 +261,5 @@ Stored in `.env` at project root (not `.env.local`). Add to Vercel dashboard man
 | Email Reminders | 3/invoice | 7/invoice | 7/invoice |
 | WhatsApp | No | Yes | Yes |
 | AI Extraction | No | 50/mo | Unlimited |
-| QuickBooks Sync | No | No | Yes |
+| Zoho Books Sync | No | No | Yes |
 | Team Members | 1 | 1 | Up to 5 |
