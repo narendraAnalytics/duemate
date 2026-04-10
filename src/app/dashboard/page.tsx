@@ -1,9 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +49,7 @@ type Product = {
   createdAt: string;
 };
 
-type Tab = "customers" | "products" | "sales";
+type Tab = "customers" | "products" | "sales" | "insights";
 
 type InvoiceStatus = "pending" | "due_soon" | "overdue" | "paid" | "cancelled";
 
@@ -106,6 +121,25 @@ const D = {
   shadowHover: "0 4px 24px rgba(0,0,0,0.1)",
   radius: "14px",
   radiusSm: "8px",
+};
+
+const CC = {
+  indigo: "#5B5EF4",
+  amber: "#D97706",
+  green: "#16A34A",
+  red: "#DC2626",
+  slate: "#64748B",
+  purple: "#9333EA",
+  cyan: "#0891B2",
+  orange: "#EA580C",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  paid: CC.green,
+  pending: CC.amber,
+  overdue: CC.red,
+  "due soon": CC.orange,
+  cancelled: CC.slate,
 };
 
 // ─── Input Field ──────────────────────────────────────────────────────────────
@@ -2848,10 +2882,610 @@ function SalesSection() {
 }
 
 
+// ─── Insights Section ─────────────────────────────────────────────────────────
+
+function InsightsSection() {
+  const [invoiceList, setInvoiceList] = useState<InvoiceRow[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [fetching, setFetching] = useState(true);
+  const [period, setPeriod] = useState<"monthly" | "quarterly" | "yearly">("monthly");
+  const [aiSummary, setAiSummary] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+
+  const fetchData = useCallback(async () => {
+    setFetching(true);
+    try {
+      const [invRes, custRes, prodRes] = await Promise.all([
+        fetch("/api/invoices"),
+        fetch("/api/customers"),
+        fetch("/api/products"),
+      ]);
+      const [invData, custData, prodData] = await Promise.all([
+        invRes.json(),
+        custRes.json(),
+        prodRes.json(),
+      ]);
+      if (invData.success) setInvoiceList(invData.data ?? []);
+      if (custData.success) setCustomers(custData.data ?? []);
+      if (prodData.success) setProducts(prodData.data ?? []);
+    } finally {
+      setFetching(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ── KPIs ──────────────────────────────────────────────────────────────────
+  const totalRevenue = useMemo(
+    () => invoiceList.reduce((s, inv) => s + parseFloat(inv.amount ?? "0"), 0),
+    [invoiceList]
+  );
+  const totalCollected = useMemo(
+    () => invoiceList.reduce((s, inv) => s + parseFloat(inv.paidAmount ?? "0"), 0),
+    [invoiceList]
+  );
+  const totalOutstanding = useMemo(
+    () => invoiceList.reduce((s, inv) => s + parseFloat(inv.balanceAmount ?? "0"), 0),
+    [invoiceList]
+  );
+  const totalTax = useMemo(
+    () => invoiceList.reduce((s, inv) => s + parseFloat(inv.taxAmount ?? "0"), 0),
+    [invoiceList]
+  );
+  const totalDiscounts = useMemo(
+    () => invoiceList.reduce((s, inv) => s + parseFloat(inv.discountAmount ?? "0"), 0),
+    [invoiceList]
+  );
+  const paidCash = useMemo(
+    () => invoiceList.reduce((s, inv) => s + parseFloat(inv.paidCash ?? "0"), 0),
+    [invoiceList]
+  );
+  const paidOnline = useMemo(
+    () => invoiceList.reduce((s, inv) => s + parseFloat(inv.paidOnline ?? "0"), 0),
+    [invoiceList]
+  );
+
+  const collectionRate = totalRevenue > 0 ? Math.round((totalCollected / totalRevenue) * 100) : 0;
+  const avgInvoiceValue = invoiceList.length > 0 ? Math.round(totalRevenue / invoiceList.length) : 0;
+
+  const overdueInvoices = useMemo(
+    () => invoiceList.filter((inv) => inv.status === "overdue"),
+    [invoiceList]
+  );
+  const overdueAmount = useMemo(
+    () => overdueInvoices.reduce((s, inv) => s + parseFloat(inv.balanceAmount ?? "0"), 0),
+    [overdueInvoices]
+  );
+
+  // ── Days Sales Outstanding ─────────────────────────────────────────────────
+  const dso = useMemo(() => {
+    const paid = invoiceList.filter(
+      (inv) => inv.status === "paid" && inv.issueDate && inv.paidAt
+    );
+    if (!paid.length) return 0;
+    const total = paid.reduce((s, inv) => {
+      const diff =
+        (new Date(inv.paidAt!).getTime() - new Date(inv.issueDate!).getTime()) /
+        86400000;
+      return s + diff;
+    }, 0);
+    return Math.round(total / paid.length);
+  }, [invoiceList]);
+
+  // ── Status pie data ────────────────────────────────────────────────────────
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      paid: 0, pending: 0, overdue: 0, due_soon: 0, cancelled: 0,
+    };
+    invoiceList.forEach((inv) => {
+      counts[inv.status] = (counts[inv.status] ?? 0) + 1;
+    });
+    return Object.entries(counts)
+      .filter(([, v]) => v > 0)
+      .map(([name, value]) => ({ name: name.replace("_", " "), value }));
+  }, [invoiceList]);
+
+  // ── Revenue over time ──────────────────────────────────────────────────────
+  const revenueChartData = useMemo(() => {
+    const map = new Map<string, { revenue: number; collected: number }>();
+    invoiceList.forEach((inv) => {
+      if (!inv.issueDate) return;
+      let key: string;
+      if (period === "monthly") {
+        key = inv.issueDate.slice(0, 7);
+      } else if (period === "quarterly") {
+        const d = new Date(inv.issueDate);
+        key = `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3) + 1}`;
+      } else {
+        key = inv.issueDate.slice(0, 4);
+      }
+      const cur = map.get(key) ?? { revenue: 0, collected: 0 };
+      cur.revenue += parseFloat(inv.amount ?? "0");
+      cur.collected += parseFloat(inv.paidAmount ?? "0");
+      map.set(key, cur);
+    });
+    const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    const sliced = period === "monthly" ? sorted.slice(-12) : sorted;
+    return sliced.map(([k, data]) => {
+      let label = k;
+      if (period === "monthly") {
+        label = new Date(k + "-01").toLocaleDateString("en-IN", {
+          month: "short",
+          year: "2-digit",
+        });
+      } else if (period === "quarterly") {
+        const [yr, q] = k.split("-");
+        label = `${q} ${yr}`;
+      }
+      return { period: label, revenue: Math.round(data.revenue), collected: Math.round(data.collected) };
+    });
+  }, [invoiceList, period]);
+
+  // ── Quarterly revenue (always) ─────────────────────────────────────────────
+  const quarterlyData = useMemo(() => {
+    const map = new Map<string, number>();
+    invoiceList.forEach((inv) => {
+      if (!inv.issueDate) return;
+      const d = new Date(inv.issueDate);
+      const key = `Q${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}`;
+      map.set(key, (map.get(key) ?? 0) + parseFloat(inv.amount ?? "0"));
+    });
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([period, revenue]) => ({ period, revenue: Math.round(revenue) }));
+  }, [invoiceList]);
+
+  // ── Top customers ──────────────────────────────────────────────────────────
+  const topCustomers = useMemo(() => {
+    const map = new Map<string, { name: string; revenue: number }>();
+    invoiceList.forEach((inv) => {
+      if (!inv.customerId) return;
+      const name = inv.customerShopName ?? inv.customerName ?? "Unknown";
+      const cur = map.get(inv.customerId) ?? { name, revenue: 0 };
+      cur.revenue += parseFloat(inv.amount ?? "0");
+      map.set(inv.customerId, cur);
+    });
+    return Array.from(map.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 8)
+      .map((c) => ({ ...c, revenue: Math.round(c.revenue) }));
+  }, [invoiceList]);
+
+  // ── Tax vs discounts by month ──────────────────────────────────────────────
+  const taxDiscountData = useMemo(() => {
+    const map = new Map<string, { tax: number; discount: number }>();
+    invoiceList.forEach((inv) => {
+      if (!inv.issueDate) return;
+      const key = inv.issueDate.slice(0, 7);
+      const cur = map.get(key) ?? { tax: 0, discount: 0 };
+      cur.tax += parseFloat(inv.taxAmount ?? "0");
+      cur.discount += parseFloat(inv.discountAmount ?? "0");
+      map.set(key, cur);
+    });
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-8)
+      .map(([k, data]) => ({
+        month: new Date(k + "-01").toLocaleDateString("en-IN", {
+          month: "short",
+          year: "2-digit",
+        }),
+        tax: Math.round(data.tax),
+        discount: Math.round(data.discount),
+      }));
+  }, [invoiceList]);
+
+  // ── Top product by line-item revenue ──────────────────────────────────────
+  const topProductName = useMemo(() => {
+    const map = new Map<string, { name: string; total: number }>();
+    invoiceList.forEach((inv) => {
+      inv.extractedData?.lineItems?.forEach((li) => {
+        const cur = map.get(li.productId) ?? { name: li.name, total: 0 };
+        cur.total += li.subtotal;
+        map.set(li.productId, cur);
+      });
+    });
+    return (
+      Array.from(map.values()).sort((a, b) => b.total - a.total)[0]?.name ?? ""
+    );
+  }, [invoiceList]);
+
+  // ── Products by purchase investment ───────────────────────────────────────
+  const topProductsByPurchase = useMemo(
+    () =>
+      products
+        .filter((p) => p.purchaseRate && parseFloat(p.purchaseRate) > 0)
+        .map((p) => ({
+          name: p.name,
+          investment: Math.round(
+            parseFloat(p.purchaseRate ?? "0") *
+              p.quantity *
+              (1 + parseFloat(p.gstRate ?? "0") / 100)
+          ),
+          quantity: p.quantity,
+          unit: p.unit ?? "",
+        }))
+        .sort((a, b) => b.investment - a.investment)
+        .slice(0, 5),
+    [products]
+  );
+
+  // ── AI summary ────────────────────────────────────────────────────────────
+  const doFetchAiSummary = useCallback(async () => {
+    if (totalRevenue === 0) return;
+    setAiLoading(true);
+    setAiError("");
+    try {
+      const res = await fetch("/api/analytics/ai-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          totalRevenue: Math.round(totalRevenue),
+          totalCollected: Math.round(totalCollected),
+          totalOutstanding: Math.round(totalOutstanding),
+          overdueCount: overdueInvoices.length,
+          overdueAmount: Math.round(overdueAmount),
+          topCustomer: topCustomers[0]?.name ?? "",
+          topProduct: topProductName,
+          invoiceCount: invoiceList.length,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) setAiSummary(data.data);
+      else setAiError("Could not generate summary.");
+    } catch {
+      setAiError("Could not connect to AI.");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [totalRevenue, totalCollected, totalOutstanding, overdueInvoices.length, overdueAmount, topCustomers, topProductName, invoiceList.length]);
+
+  useEffect(() => {
+    if (!fetching && invoiceList.length > 0) doFetchAiSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetching]);
+
+  const fmt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
+  const fmtK = (v: number) =>
+    v >= 100000
+      ? "₹" + (v / 100000).toFixed(1) + "L"
+      : v >= 1000
+      ? "₹" + Math.round(v / 1000) + "k"
+      : "₹" + v;
+
+  // ── Light theme tokens for Insights ──────────────────────────────────────
+  const I = {
+    card: "rgba(255,255,255,0.82)",
+    cardBorder: "rgba(129,140,248,0.14)",
+    text: "#1E1B3A",
+    textMid: "#6B7280",
+    textFaint: "#9CA3AF",
+    indigo: "#5B5EF4", indigoBg: "rgba(91,94,244,0.08)",  indigoBorder: "rgba(91,94,244,0.2)",
+    green: "#059669",  greenBg:  "rgba(5,150,105,0.08)",   greenBorder:  "rgba(5,150,105,0.2)",
+    amber: "#D97706",  amberBg:  "rgba(217,119,6,0.08)",   amberBorder:  "rgba(217,119,6,0.2)",
+    red: "#DC2626",    redBg:    "rgba(220,38,38,0.08)",   redBorder:    "rgba(220,38,38,0.2)",
+    purple: "#7C3AED", purpleBg: "rgba(124,58,237,0.08)",  purpleBorder: "rgba(124,58,237,0.2)",
+    cyan: "#0891B2",   cyanBg:   "rgba(8,145,178,0.08)",   cyanBorder:   "rgba(8,145,178,0.2)",
+  };
+
+  const tooltipStyle = {
+    background: "rgba(255,255,255,0.98)",
+    border: "1px solid rgba(129,140,248,0.18)",
+    borderRadius: "10px",
+    fontFamily: "var(--font-body)",
+    fontSize: "12px",
+    color: I.text,
+    boxShadow: "0 4px 20px rgba(91,94,244,0.1)",
+  };
+
+  const glassCard = (accent?: string) => ({
+    background: accent ? accent : I.card,
+    border: `1px solid ${I.cardBorder}`,
+    borderRadius: "16px",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
+    boxShadow: "0 2px 16px rgba(91,94,244,0.06)",
+    overflow: "hidden" as const,
+    position: "relative" as const,
+  });
+
+  const chartTick = { fontFamily: "var(--font-body)", fontSize: 11, fill: I.textFaint };
+
+  if (fetching) {
+    return (
+      <div style={{
+        background: "linear-gradient(160deg, #F5F3FF, #EEF2FF)",
+        borderRadius: "20px",
+        border: "1px solid rgba(129,140,248,0.15)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        height: "340px", gap: "12px",
+      }}>
+        <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: I.indigo }} />
+        <span style={{ fontFamily: "var(--font-body)", fontSize: "14px", color: I.textMid }}>Loading insights…</span>
+      </div>
+    );
+  }
+
+  if (invoiceList.length === 0) {
+    return (
+      <div style={{
+        background: "linear-gradient(160deg, #F5F3FF, #EEF2FF)",
+        borderRadius: "20px",
+        border: "1px solid rgba(129,140,248,0.15)",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        height: "340px", gap: "14px",
+      }}>
+        <div style={{ fontSize: "40px", opacity: 0.25, color: I.indigo }}>✦</div>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: "1.4rem", color: I.text, letterSpacing: "0.06em" }}>INSIGHTS</p>
+        <p style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: "14px", color: I.textMid }}>Create your first invoice to see analytics</p>
+      </div>
+    );
+  }
+
+  const topShare =
+    topCustomers.length > 0 && totalRevenue > 0
+      ? topCustomers[0].revenue / totalRevenue
+      : 0;
+
+  return (
+    <div style={{
+      background: "linear-gradient(160deg, #F5F3FF 0%, #EEF2FF 45%, #F0F4FF 100%)",
+      borderRadius: "20px",
+      padding: "28px",
+      border: "1px solid rgba(129,140,248,0.18)",
+      boxShadow: "0 4px 40px rgba(91,94,244,0.08), inset 0 1px 0 rgba(255,255,255,0.9)",
+      display: "flex",
+      flexDirection: "column",
+      gap: "14px",
+      marginBottom: "20px",
+    }}>
+
+      {/* ── Header ───────────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+        <div>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(1.4rem,2vw,1.9rem)", color: I.text, letterSpacing: "0.08em", lineHeight: 1 }}>
+            INSIGHTS
+          </h2>
+          <p style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: "13px", color: I.textMid, marginTop: "4px" }}>
+            Visual analytics · {invoiceList.length} invoices · {customers.length} customers
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "rgba(91,94,244,0.07)", borderRadius: "10px", padding: "4px", border: "1px solid rgba(91,94,244,0.12)" }}>
+          {(["monthly", "quarterly", "yearly"] as const).map((p) => (
+            <button key={p} type="button" onClick={() => setPeriod(p)} style={{
+              background: period === p ? `linear-gradient(135deg, ${I.indigo}, #7C3AED)` : "transparent",
+              color: period === p ? "#fff" : I.textFaint,
+              border: "none",
+              borderRadius: "7px",
+              padding: "5px 14px",
+              fontFamily: "var(--font-body)",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+              letterSpacing: "0.05em",
+              textTransform: "capitalize",
+              boxShadow: period === p ? "0 2px 10px rgba(91,94,244,0.35)" : "none",
+              transition: "all 0.2s",
+            }}>
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Row 1: KPI Cards ─────────────────────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px" }}>
+        {[
+          { label: "Total Revenue", value: fmt(totalRevenue), sub: `${invoiceList.length} invoices`, accent: I.indigo, bg: I.indigoBg, border: I.indigoBorder },
+          { label: "Collected", value: fmt(totalCollected), sub: `${collectionRate}% collected`, accent: I.green, bg: I.greenBg, border: I.greenBorder },
+          { label: "Outstanding", value: fmt(totalOutstanding), sub: `${overdueInvoices.length} overdue`, accent: overdueInvoices.length > 0 ? I.amber : I.green, bg: overdueInvoices.length > 0 ? I.amberBg : I.greenBg, border: overdueInvoices.length > 0 ? I.amberBorder : I.greenBorder },
+          { label: "Tax Collected", value: fmt(totalTax), sub: `₹${Math.round(totalDiscounts).toLocaleString("en-IN")} discounts`, accent: I.purple, bg: I.purpleBg, border: I.purpleBorder },
+        ].map((card) => (
+          <div key={card.label} style={{ background: card.bg, border: `1px solid ${card.border}`, borderRadius: "14px", padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: "-16px", right: "-16px", width: "70px", height: "70px", background: `radial-gradient(circle, ${card.accent}33 0%, transparent 70%)`, pointerEvents: "none" }} />
+            <p style={{ fontFamily: "var(--font-body)", fontSize: "10px", fontWeight: 600, color: card.accent, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px", opacity: 0.85 }}>{card.label}</p>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: "1.55rem", color: I.text, letterSpacing: "0.02em", textShadow: `0 0 20px ${card.accent}55` }}>{card.value}</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: "11px", color: I.textFaint, marginTop: "5px" }}>{card.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Row 2: AI Business Health ─────────────────────────────── */}
+      <div style={{
+        background: "linear-gradient(135deg, rgba(91,94,244,0.06) 0%, rgba(124,58,237,0.04) 100%)",
+        border: "1px solid rgba(91,94,244,0.18)",
+        borderRadius: "14px",
+        padding: "14px 18px",
+        display: "flex", alignItems: "center", gap: "14px",
+        boxShadow: "0 2px 20px rgba(91,94,244,0.07)",
+      }}>
+        <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "linear-gradient(135deg,#5B5EF4,#7C3AED)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "14px", color: "#fff", boxShadow: "0 2px 12px rgba(91,94,244,0.35)" }}>✦</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: "9px", fontWeight: 700, color: I.indigo, letterSpacing: "0.12em", textTransform: "uppercase", marginRight: "10px" }}>AI · Gemini</span>
+          {aiLoading
+            ? <span style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: "13px", color: I.textMid }}>Analysing your business…</span>
+            : aiError
+            ? <span style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: I.red }}>{aiError}</span>
+            : <span style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: "13px", color: I.text, lineHeight: 1.6 }}>{aiSummary}</span>
+          }
+        </div>
+        <button type="button" onClick={doFetchAiSummary} disabled={aiLoading} style={{ background: "rgba(91,94,244,0.08)", border: "1px solid rgba(91,94,244,0.2)", borderRadius: "8px", padding: "5px 12px", fontFamily: "var(--font-body)", fontSize: "11px", color: I.indigo, cursor: aiLoading ? "not-allowed" : "pointer", flexShrink: 0, fontWeight: 600 }}>↻</button>
+      </div>
+
+      {/* ── Row 3: Revenue chart (3fr) + Status pie (1fr) ────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "3fr 1fr", gap: "10px" }}>
+        <div style={{ ...glassCard(), padding: "18px 20px" }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, color: I.text, marginBottom: "14px", letterSpacing: "0.04em" }}>Revenue vs Collected</p>
+          <ResponsiveContainer width="100%" height={185}>
+            <LineChart data={revenueChartData} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={I.indigo} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={I.indigo} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+              <XAxis dataKey="period" tick={chartTick} axisLine={false} tickLine={false} />
+              <YAxis tick={chartTick} axisLine={false} tickLine={false} tickFormatter={fmtK} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(Number(v ?? 0))} />
+              <Legend wrapperStyle={{ fontFamily: "var(--font-body)", fontSize: "11px", color: I.textMid }} />
+              <Line type="monotone" dataKey="revenue" stroke={I.indigo} strokeWidth={2.5} dot={false} name="Revenue" />
+              <Line type="monotone" dataKey="collected" stroke={I.green} strokeWidth={2.5} dot={false} name="Collected" strokeDasharray="5 3" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div style={{ ...glassCard(), padding: "18px 16px" }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, color: I.text, marginBottom: "10px", letterSpacing: "0.04em" }}>Invoice Status</p>
+          <ResponsiveContainer width="100%" height={185}>
+            <PieChart>
+              <Pie data={statusCounts} cx="50%" cy="45%" innerRadius={44} outerRadius={68} paddingAngle={4} dataKey="value">
+                {statusCounts.map((entry) => (
+                  <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? I.cyan} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={tooltipStyle} formatter={(v, name) => [Number(v ?? 0) + " inv", String(name)]} />
+              <Legend wrapperStyle={{ fontFamily: "var(--font-body)", fontSize: "10px", color: I.textMid }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* ── Row 4: Top customers (2fr) + Quarterly (1fr) + Payment (1fr) ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "10px" }}>
+        {topCustomers.length > 0 && (
+          <div style={{ ...glassCard(), padding: "18px 20px" }}>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, color: I.text, marginBottom: "12px", letterSpacing: "0.04em" }}>Top Customers</p>
+            <ResponsiveContainer width="100%" height={185}>
+              <BarChart data={topCustomers.slice(0,6)} layout="vertical" margin={{ top: 0, right: 50, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" horizontal={false} />
+                <XAxis type="number" tick={chartTick} axisLine={false} tickLine={false} tickFormatter={fmtK} />
+                <YAxis type="category" dataKey="name" width={110} tick={{ ...chartTick, fill: I.textMid }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(Number(v ?? 0))} />
+                <Bar dataKey="revenue" radius={[0, 4, 4, 0]} name="Revenue" label={{ position: "right", // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter: (v: any) => fmtK(Number(v ?? 0)), fontFamily: "var(--font-body)", fontSize: 10, fill: I.textFaint }}>
+                  {topCustomers.slice(0,6).map((_, idx) => (
+                    <Cell key={idx} fill={`rgba(129,140,248,${0.9 - idx * 0.12})`} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {quarterlyData.length > 0 && (
+          <div style={{ ...glassCard(), padding: "18px 16px" }}>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, color: I.text, marginBottom: "12px", letterSpacing: "0.04em" }}>Quarterly</p>
+            <ResponsiveContainer width="100%" height={185}>
+              <BarChart data={quarterlyData} margin={{ top: 0, right: 4, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                <XAxis dataKey="period" tick={{ ...chartTick, fontSize: 9 }} axisLine={false} tickLine={false} />
+                <YAxis tick={chartTick} axisLine={false} tickLine={false} tickFormatter={fmtK} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(Number(v ?? 0))} />
+                <Bar dataKey="revenue" radius={[4, 4, 0, 0]} name="Revenue">
+                  {quarterlyData.map((_, idx) => (
+                    <Cell key={idx} fill={[I.indigo, I.green, I.amber, I.purple][idx % 4]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        <div style={{ ...glassCard(), padding: "18px 16px" }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, color: I.text, marginBottom: "12px", letterSpacing: "0.04em" }}>Payment Split</p>
+          <ResponsiveContainer width="100%" height={185}>
+            <BarChart data={[{ name: "Cash", value: Math.round(paidCash) }, { name: "Online", value: Math.round(paidOnline) }]} margin={{ top: 0, right: 4, bottom: 0, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+              <XAxis dataKey="name" tick={chartTick} axisLine={false} tickLine={false} />
+              <YAxis tick={chartTick} axisLine={false} tickLine={false} tickFormatter={fmtK} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(Number(v ?? 0))} />
+              <Bar dataKey="value" name="Amount" radius={[5, 5, 0, 0]}>
+                <Cell fill={I.amber} />
+                <Cell fill={I.indigo} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* ── Row 5: Tax vs Discounts (1fr) ─────────────────────────── */}
+      {taxDiscountData.length > 0 && (
+        <div style={{ ...glassCard(), padding: "18px 20px" }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, color: I.text, marginBottom: "12px", letterSpacing: "0.04em" }}>Tax vs Discounts (Monthly)</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={taxDiscountData} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+              <XAxis dataKey="month" tick={{ ...chartTick, fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ ...chartTick, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={fmtK} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => fmt(Number(v ?? 0))} />
+              <Legend wrapperStyle={{ fontFamily: "var(--font-body)", fontSize: "11px", color: I.textMid }} />
+              <Bar dataKey="tax" fill={I.purple} radius={[3, 3, 0, 0]} name="Tax" />
+              <Bar dataKey="discount" fill={I.amber} radius={[3, 3, 0, 0]} name="Discount" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── Row 6: Products + Business Health ────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: topProductsByPurchase.length > 0 ? "1fr 1fr" : "1fr", gap: "10px" }}>
+
+        {topProductsByPurchase.length > 0 && (
+          <div style={{ ...glassCard(), padding: "18px 20px" }}>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, color: I.text, marginBottom: "14px", letterSpacing: "0.04em" }}>Purchase Investment</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {topProductsByPurchase.map((p, i) => {
+                const accent = [I.indigo, I.green, I.amber, I.purple, I.cyan][i];
+                const max = topProductsByPurchase[0].investment;
+                const pct = max > 0 ? (p.investment / max) * 100 : 0;
+                return (
+                  <div key={p.name}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                      <span style={{ fontFamily: "var(--font-body)", fontSize: "11px", color: I.textMid, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "60%" }}>{p.name}</span>
+                      <span style={{ fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 700, color: accent }}>{fmt(p.investment)}</span>
+                    </div>
+                    <div style={{ height: "4px", background: "rgba(255,255,255,0.07)", borderRadius: "2px" }}>
+                      <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${accent}, ${accent}99)`, borderRadius: "2px", boxShadow: `0 0 8px ${accent}55` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div style={{ ...glassCard(), padding: "18px 20px" }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, color: I.text, marginBottom: "14px", letterSpacing: "0.04em" }}>Business Health</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 18px" }}>
+            {[
+              { label: "Collection Rate", value: collectionRate + "%", color: collectionRate >= 80 ? I.green : collectionRate >= 50 ? I.amber : I.red, sub: collectionRate >= 80 ? "Excellent" : collectionRate >= 50 ? "Average" : "Low" },
+              { label: "Avg Invoice", value: fmt(avgInvoiceValue), color: I.indigo, sub: "per invoice" },
+              { label: "Days Outstanding", value: dso > 0 ? dso + "d" : "—", color: dso === 0 || dso <= 30 ? I.green : dso <= 60 ? I.amber : I.red, sub: dso === 0 ? "No paid yet" : dso <= 30 ? "Healthy" : dso <= 60 ? "Watch" : "Slow" },
+              { label: "Overdue Balance", value: fmt(overdueAmount), color: overdueAmount > 0 ? I.red : I.green, sub: overdueInvoices.length + " invoices" },
+              { label: "Customers", value: String(customers.length), color: I.cyan, sub: topCustomers[0]?.name?.slice(0, 14) ?? "—" },
+              { label: "Top Share", value: topCustomers.length > 0 && totalRevenue > 0 ? Math.round(topShare * 100) + "%" : "—", color: topShare > 0.6 ? I.amber : I.green, sub: topShare > 0.6 ? "⚠ Concentrated" : "Spread" },
+            ].map((m) => (
+              <div key={m.label} style={{ borderLeft: `2px solid ${m.color}`, paddingLeft: "10px" }}>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: "9px", fontWeight: 700, color: I.textFaint, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "2px" }}>{m.label}</p>
+                <p style={{ fontFamily: "var(--font-display)", fontSize: "1.2rem", color: I.text, letterSpacing: "0.02em", textShadow: `0 0 12px ${m.color}44` }}>{m.value}</p>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: "10px", color: m.color, marginTop: "1px" }}>{m.sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
 const TABS: { id: Tab; label: string; numeral: string }[] = [
   { id: "customers", label: "Buyers", numeral: "I" },
   { id: "products", label: "Products", numeral: "II" },
   { id: "sales", label: "Sales", numeral: "III" },
+  { id: "insights", label: "Insights", numeral: "IV" },
 ];
 
 export default function DashboardPage() {
@@ -3046,7 +3680,7 @@ export default function DashboardPage() {
       <main
         style={{
           padding: "40px",
-          maxWidth: "920px",
+          maxWidth: activeTab === "insights" ? "1140px" : "920px",
           margin: "0 auto",
         }}
       >
@@ -3061,6 +3695,7 @@ export default function DashboardPage() {
             {activeTab === "customers" && <CustomersSection />}
             {activeTab === "products" && <ProductsSection />}
             {activeTab === "sales" && <SalesSection />}
+            {activeTab === "insights" && <InsightsSection />}
           </motion.div>
         </AnimatePresence>
       </main>
