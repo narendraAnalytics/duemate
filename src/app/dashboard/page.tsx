@@ -49,6 +49,15 @@ type Product = {
   createdAt: string;
 };
 
+type Supplier = {
+  id: string;
+  name: string;
+  shopName: string;
+  phone: string | null;
+  gstin: string | null;
+  createdAt: string;
+};
+
 type Tab = "customers" | "products" | "sales" | "insights";
 
 type InvoiceStatus = "pending" | "due_soon" | "overdue" | "paid" | "cancelled";
@@ -1091,6 +1100,18 @@ function ProductsSection() {
   const [success, setSuccess] = useState(false);
   const [planLimitInfo, setPlanLimitInfo] = useState<{ resource: string; limit: number } | null>(null);
 
+  // Supplier state
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [selectedSupplierId, setSelectedSupplierId] = useState("");
+  const [supplierForm, setSupplierForm] = useState({ name: "", shopName: "", phone: "", gstin: "" });
+  const [savingSupplier, setSavingSupplier] = useState(false);
+  const [supplierError, setSupplierError] = useState("");
+  const [supplierSuccess, setSupplierSuccess] = useState(false);
+  const [editingSupplierId, setEditingSupplierId] = useState<string | null>(null);
+  const [editSupplierDraft, setEditSupplierDraft] = useState({ name: "", shopName: "", phone: "", gstin: "" });
+  const [editSupplierLoading, setEditSupplierLoading] = useState(false);
+  const [editSupplierError, setEditSupplierError] = useState("");
+
   const fetchList = useCallback(async () => {
     setFetching(true);
     const res = await fetch("/api/products");
@@ -1099,9 +1120,73 @@ function ProductsSection() {
     setFetching(false);
   }, []);
 
+  const fetchSuppliers = useCallback(async () => {
+    const res = await fetch("/api/suppliers");
+    const json = await res.json();
+    if (json.success) setSuppliers(json.data);
+  }, []);
+
   useEffect(() => {
     fetchList();
-  }, [fetchList]);
+    fetchSuppliers();
+  }, [fetchList, fetchSuppliers]);
+
+  async function handleAddSupplier(e: React.FormEvent) {
+    e.preventDefault();
+    if (!supplierForm.name.trim()) return setSupplierError("Supplier name is required.");
+    if (!supplierForm.shopName.trim()) return setSupplierError("Shop name is required.");
+    if (supplierForm.phone && !/^\d{10}$/.test(supplierForm.phone))
+      return setSupplierError("Phone must be exactly 10 digits.");
+    if (supplierForm.gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/.test(supplierForm.gstin))
+      return setSupplierError("Invalid GSTIN format (e.g. 27ABCDE1234F2Z5).");
+    setSupplierError("");
+    setSavingSupplier(true);
+    const res = await fetch("/api/suppliers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(supplierForm),
+    });
+    const json = await res.json();
+    setSavingSupplier(false);
+    if (json.success) {
+      setSupplierForm({ name: "", shopName: "", phone: "", gstin: "" });
+      setSupplierSuccess(true);
+      setTimeout(() => setSupplierSuccess(false), 2000);
+      fetchSuppliers();
+    } else {
+      setSupplierError(typeof json.error === "string" ? json.error : "Failed to save supplier.");
+    }
+  }
+
+  function startEditSupplier(s: Supplier) {
+    setEditingSupplierId(s.id);
+    setEditSupplierDraft({ name: s.name, shopName: s.shopName, phone: s.phone ?? "", gstin: s.gstin ?? "" });
+    setEditSupplierError("");
+  }
+
+  async function handleEditSupplierSave() {
+    if (!editSupplierDraft.name.trim()) return setEditSupplierError("Supplier name is required.");
+    if (!editSupplierDraft.shopName.trim()) return setEditSupplierError("Shop name is required.");
+    if (editSupplierDraft.phone && !/^\d{10}$/.test(editSupplierDraft.phone))
+      return setEditSupplierError("Phone must be exactly 10 digits.");
+    if (editSupplierDraft.gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/.test(editSupplierDraft.gstin))
+      return setEditSupplierError("Invalid GSTIN format.");
+    setEditSupplierError("");
+    setEditSupplierLoading(true);
+    const res = await fetch(`/api/suppliers/${editingSupplierId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editSupplierDraft),
+    });
+    const json = await res.json();
+    setEditSupplierLoading(false);
+    if (json.success) {
+      setEditingSupplierId(null);
+      fetchSuppliers();
+    } else {
+      setEditSupplierError(typeof json.error === "string" ? json.error : "Update failed.");
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -1140,6 +1225,7 @@ function ProductsSection() {
     setLoading(false);
     if (json.success) {
       setForm({ name: "", description: "", rate: "", unit: "pcs", quantity: "", gstRate: "18", purchaseRate: "", purchaseDate: "", supplierShop: "", supplierPhone: "", supplierGstin: "", hsnCode: "" });
+      setSelectedSupplierId("");
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
       fetchList();
@@ -1160,6 +1246,83 @@ function ProductsSection() {
         title="Add Product"
         sub="Define the goods or materials you sell with their rates"
       />
+
+      {/* ── Saved Suppliers sub-section ───────────────────────────────── */}
+      <div style={{ background: D.surface, borderRadius: D.radius, padding: "24px 32px", boxShadow: D.shadow, border: `1px solid ${D.borderFaint}` }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginBottom: "20px" }}>
+          <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.2rem", color: D.text, letterSpacing: "0.03em" }}>Saved Suppliers</h3>
+          <span style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: "13px", color: D.textFaint }}>select when adding a product to auto-fill details</span>
+        </div>
+
+        {/* Add supplier form */}
+        <form onSubmit={handleAddSupplier} style={{ marginBottom: "20px", paddingBottom: "20px", borderBottom: `1px solid ${D.borderFaint}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: "12px", alignItems: "end" }}>
+            <InputField label="Supplier Name" name="s-name" value={supplierForm.name} onChange={(v) => setSupplierForm((f) => ({ ...f, name: v }))} placeholder="e.g. Sharma Fabrics" required />
+            <InputField label="Shop Name" name="s-shop" value={supplierForm.shopName} onChange={(v) => setSupplierForm((f) => ({ ...f, shopName: v }))} placeholder="e.g. Sharma Textiles" required />
+            <InputField label="Phone (optional)" name="s-phone" value={supplierForm.phone} onChange={(v) => setSupplierForm((f) => ({ ...f, phone: v.replace(/\D/g, "").slice(0, 10) }))} placeholder="10-digit number" />
+            <InputField label="GSTIN (optional)" name="s-gstin" value={supplierForm.gstin} onChange={(v) => setSupplierForm((f) => ({ ...f, gstin: v.toUpperCase().slice(0, 15) }))} placeholder="e.g. 27ABCDE1234F2Z5" />
+            <button
+              type="submit"
+              disabled={savingSupplier}
+              style={{ background: D.primary, color: "#fff", border: "none", borderRadius: D.radiusSm, padding: "11px 18px", fontFamily: "var(--font-body)", fontSize: "13px", fontWeight: 600, cursor: savingSupplier ? "not-allowed" : "pointer", opacity: savingSupplier ? 0.7 : 1, whiteSpace: "nowrap" }}
+            >
+              {savingSupplier ? "Saving…" : "+ Add"}
+            </button>
+          </div>
+          {supplierError && <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: "#DC2626", marginTop: "8px" }}>{supplierError}</p>}
+          {supplierSuccess && <p style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: "13px", color: "#16A34A", marginTop: "8px" }}>Supplier saved!</p>}
+        </form>
+
+        {/* Supplier list */}
+        {suppliers.length === 0 ? (
+          <p style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", color: D.textFaint, fontSize: "13px" }}>No suppliers saved yet — add one above.</p>
+        ) : (
+          <div style={{ border: `1px solid ${D.borderFaint}`, borderRadius: D.radiusSm, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr auto", padding: "10px 16px", background: D.surfaceAlt, borderBottom: `1px solid ${D.borderFaint}` }}>
+              {["Name", "Shop", "Phone", "GSTIN", ""].map((h, i) => (
+                <span key={i} style={{ fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 700, color: D.textFaint, letterSpacing: "0.09em", textTransform: "uppercase" }}>{h}</span>
+              ))}
+            </div>
+            {suppliers.map((s, i) => (
+              <motion.div
+                key={s.id}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
+                style={{ borderBottom: i < suppliers.length - 1 ? `1px solid ${D.borderFaint}` : "none", background: editingSupplierId === s.id ? D.primaryLight : i % 2 === 0 ? D.surface : "rgba(244,240,232,0.4)" }}
+              >
+                {editingSupplierId === s.id ? (
+                  <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px" }}>
+                      <InputField label="Name" name={`es-name-${s.id}`} value={editSupplierDraft.name} onChange={(v) => setEditSupplierDraft((d) => ({ ...d, name: v }))} placeholder="" required />
+                      <InputField label="Shop" name={`es-shop-${s.id}`} value={editSupplierDraft.shopName} onChange={(v) => setEditSupplierDraft((d) => ({ ...d, shopName: v }))} placeholder="" required />
+                      <InputField label="Phone" name={`es-phone-${s.id}`} value={editSupplierDraft.phone} onChange={(v) => setEditSupplierDraft((d) => ({ ...d, phone: v.replace(/\D/g, "").slice(0, 10) }))} placeholder="" />
+                      <InputField label="GSTIN" name={`es-gstin-${s.id}`} value={editSupplierDraft.gstin} onChange={(v) => setEditSupplierDraft((d) => ({ ...d, gstin: v.toUpperCase().slice(0, 15) }))} placeholder="" />
+                    </div>
+                    {editSupplierError && <span style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: "#DC2626" }}>{editSupplierError}</span>}
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <button type="button" onClick={handleEditSupplierSave} disabled={editSupplierLoading} style={{ background: D.primary, color: "#fff", border: "none", borderRadius: D.radiusSm, padding: "8px 18px", fontFamily: "var(--font-body)", fontSize: "13px", fontWeight: 600, cursor: editSupplierLoading ? "not-allowed" : "pointer", opacity: editSupplierLoading ? 0.7 : 1 }}>
+                        {editSupplierLoading ? "Saving…" : "Save Changes"}
+                      </button>
+                      <button type="button" onClick={() => setEditingSupplierId(null)} style={{ background: "transparent", color: D.textMid, border: `1px solid ${D.borderFaint}`, borderRadius: D.radiusSm, padding: "8px 16px", fontFamily: "var(--font-body)", fontSize: "13px", cursor: "pointer" }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr auto", padding: "12px 16px", alignItems: "center", gap: "8px" }}>
+                    <p style={{ fontFamily: "var(--font-body)", fontWeight: 600, color: D.text, fontSize: "13px" }}>{s.name}</p>
+                    <p style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: D.amber, fontWeight: 500 }}>{s.shopName}</p>
+                    <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: D.textMid }}>{s.phone || "—"}</p>
+                    <p style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "11px", color: D.textMid, letterSpacing: "0.04em" }}>{s.gstin || "—"}</p>
+                    <button type="button" onClick={() => startEditSupplier(s)} style={{ background: D.primaryLight, border: "none", borderRadius: "6px", padding: "3px 10px", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 600, color: D.primary }}>Edit</button>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <PlanUsageBar used={list.length} limit={10} label="Products" />
       {planLimitInfo && (
@@ -1275,6 +1438,33 @@ function ProductsSection() {
           {/* Row 4: Supplier Details */}
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <span style={{ fontSize: "11px", fontFamily: "var(--font-body)", fontWeight: 700, color: D.textFaint, letterSpacing: "0.09em", textTransform: "uppercase" }}>Supplier Details (optional)</span>
+            {suppliers.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "4px" }}>
+                <label htmlFor="select-supplier" style={{ fontSize: "11px", fontFamily: "var(--font-body)", fontWeight: 700, color: D.primary, letterSpacing: "0.09em", textTransform: "uppercase" }}>
+                  Auto-fill from Saved Supplier
+                </label>
+                <select
+                  id="select-supplier"
+                  className="db-select-light"
+                  value={selectedSupplierId}
+                  onChange={(e) => {
+                    const sid = e.target.value;
+                    setSelectedSupplierId(sid);
+                    if (sid) {
+                      const sup = suppliers.find((s) => s.id === sid);
+                      if (sup) setForm((f) => ({ ...f, supplierShop: sup.shopName, supplierPhone: sup.phone ?? "", supplierGstin: sup.gstin ?? "" }));
+                    } else {
+                      setForm((f) => ({ ...f, supplierShop: "", supplierPhone: "", supplierGstin: "" }));
+                    }
+                  }}
+                >
+                  <option value="">— type manually —</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name} · {s.shopName}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
               <InputField
                 label="Supplier Shop"

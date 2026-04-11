@@ -69,6 +69,23 @@ export const customers = pgTable("customers", {
 export type Customer = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;
 
+// ─── Suppliers ────────────────────────────────────────────────────────────────
+
+export const suppliers = pgTable("suppliers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  shopName: text("shop_name").notNull(),
+  phone: text("phone"),
+  gstin: text("gstin"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Supplier = typeof suppliers.$inferSelect;
+export type NewSupplier = typeof suppliers.$inferInsert;
+
 // ─── Products (Goods / Materials the user sells) ─────────────────────────────
 
 export const products = pgTable("products", {
