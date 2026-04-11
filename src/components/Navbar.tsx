@@ -8,10 +8,10 @@ import { UserButton, Show, useUser, useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
 const NAV_LINKS = [
-  { href: "#features",     label: "Features",     numeral: "I" },
-  { href: "#how-it-works", label: "How It Works", numeral: "II" },
-  { href: "/pricing",      label: "Pricing",      numeral: "III" },
-  { href: "/dashboard",    label: "Dashboard",    numeral: "IV" },
+  { href: "/#features",     label: "Features",     numeral: "I" },
+  { href: "/#how-it-works", label: "How It Works", numeral: "II" },
+  { href: "/pricing",       label: "Pricing",      numeral: "III" },
+  { href: "/dashboard",     label: "Dashboard",    numeral: "IV" },
 ];
 
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -75,7 +75,7 @@ export default function Navbar() {
 
   const handleNavClick = (href: string) => {
     setMenuOpen(false);
-    if (!isSignedIn && href === "/dashboard") {
+    if (!isSignedIn) {
       router.push("/sign-in");
       return;
     }

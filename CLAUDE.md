@@ -83,13 +83,13 @@ Fluid type scale in `:root` via `clamp()` — `--text-xs` through `--text-hero`.
 
 Schema: `src/lib/schema.ts` | Client: `src/lib/db.ts` (Neon HTTP driver) | Config: `drizzle.config.ts`
 
-- **users** — Clerk userId (text PK), email, name, businessName, plan (free/starter/pro), timezone
-- **customers** — uuid PK, userId FK, name, email (required), shopName (required), phone, gstin (15-char GSTIN format)
+- **users** — Clerk userId (text PK), email, name, businessName, plan (`planEnum`: `'free' | 'starter' | 'pro'` — `'starter'` is the DB value for the "Plus" plan shown in UI), timezone
+- **customers** — uuid PK, userId FK, name, email (required), shopName (required), phone, gstin (15-char GSTIN format), **lastEmailSentAt** (timestamp, nullable — stamped every time an email is sent to this buyer)
 - **products** — uuid PK, userId FK, name, description, rate (selling price), unit, quantity (stock), gstRate, purchaseRate, purchaseDate, supplierShop, supplierPhone, supplierGstin, hsnCode
 - **invoices** — uuid PK, userId FK, customerId FK, invoiceNumber, amount, currency, dueDate, issueDate, status (pending/due_soon/overdue/paid/cancelled), discountType/discountAmount, taxRate/taxAmount, paymentType, paidAmount, paidCash, paidOnline, balanceAmount, paidAt, lastPaymentAt, paymentReference, paymentNotes, notes, extractedData (jsonb — stores line items array), paymentHistory (jsonb array of `{amount, type, reference, notes, paidAt}`), fileUrl, aiConfidence
 - **reminders** — uuid PK, invoiceId FK, type, channel (email/whatsapp/both), scheduledAt, sentAt, status, messageBody, error
 - **reminder_settings** — uuid PK, userId FK (unique), 7 boolean timing toggles (day30/14/7/3/1, dueDay, overdue), emailEnabled, whatsappEnabled, customMessage, senderName
-- **notifications** — audit log, uuid PK, userId FK, reminderId FK, channel, recipient, subject, status (delivered/bounced/failed/read), externalId, sentAt
+- **notifications** — email audit log, uuid PK, userId FK, reminderId FK (nullable), channel, recipient, subject, status (delivered/bounced/failed/read), externalId (Resend email ID), sentAt. **Written after every successful Inngest email send. Also used to enforce the free plan 3-email-per-buyer-per-month cap.**
 *(zoho_integrations table — not yet created in schema; needed when Zoho integration is implemented)*
 
 ### Dynamic Route Params — Next.js 15
@@ -118,6 +118,8 @@ Defined inside `page.tsx`, not as separate files:
 - `StockBadge` — green/amber/red stock level pill
 - `ProductCard` — card with `AnimatePresence` between view/edit mode
 - `InvoiceList` — takes `{ invoiceList, fetching, onRefresh }` props; manages `expanded`, `payingId`, `payDraft` state internally
+- `PlanUsageBar` — shows used/limit progress bar per section (blue/amber/red based on % used); rendered above each section's form
+- `PlanLimitCard` — light-blue card with 🔒 icon shown when a free plan API block (`planLimit: true`) is returned; includes "Upgrade to Plus →" link to `/pricing`
 
 ### Invoice Form Flow
 1. User fills form → clicks "Preview Invoice" → `handlePreview()` validates → sets `showPreview = true`
@@ -145,7 +147,19 @@ All routes call `getOrCreateUser()` first, validate with Zod, return `{ success,
 | `/api/products` | GET, POST | List / create products |
 | `/api/products/[id]` | PATCH | Update product + stock |
 | `/api/invoices` | GET, POST | List (with customer join) / create invoices |
-| `/api/invoices/[id]` | PATCH | Record payment — adds `additionalPayment` to `paidAmount`/`paidCash`/`paidOnline`, appends to `paymentHistory`, sets `lastPaymentAt`, optionally stores `paymentReference`/`paymentNotes`. Sets status to `"paid"` when balance reaches zero. |
+| `/api/invoices/[id]` | PATCH | Record payment — adds `additionalPayment` to `paidAmount`/`paidCash`/`paidOnline`, appends to `paymentHistory`, sets `lastPaymentAt`, optionally stores `paymentReference`/`paymentNotes`. Sets status to `"paid"` when balance reaches zero. Returns `emailSkipped: boolean` to indicate whether the receipt email was suppressed by the free plan cap. |
+
+### Free Plan Enforcement
+POST routes for customers, products, and invoices check `user.plan === 'free'` and return a 403 with `{ success: false, planLimit: true, limit, used, remaining, resource }` when limits are hit. Dashboard detects `json.planLimit` and shows `PlanLimitCard` instead of a plain error.
+
+| Resource | Free Limit | Scope |
+|---|---|---|
+| Invoices | 4 | per month (counts `createdAt >= start of month`) |
+| Customers | 10 | total |
+| Products | 10 | total |
+| Emails per buyer | 3 | per month (checked via `notifications` table count) |
+
+The `PATCH /api/invoices/[id]` route pre-checks the email cap synchronously before firing the Inngest event, so `emailSkipped` is known at response time without waiting for Inngest.
 
 ## Key File Paths
 | File | Purpose |
@@ -158,18 +172,19 @@ All routes call `getOrCreateUser()` first, validate with Zod, return `{ success,
 | `src/app/globals.css` | Color system, fluid type scale, `.db-select` / `.db-select-light` classes |
 | `src/app/layout.tsx` | Fonts (3 families), ClerkProvider, metadata |
 | `src/app/page.tsx` | Landing page |
+| `src/app/pricing/page.tsx` | Pricing page — server component, requires auth (`auth()` redirect), renders Clerk `<PricingTable />` |
 | `src/app/dashboard/page.tsx` | Dashboard — all tabs + internal components (1 large file) |
-| `src/app/api/customers/route.ts` | Buyers list + create |
+| `src/app/api/customers/route.ts` | Buyers list + create (free plan: blocks at 10 total) |
 | `src/app/api/customers/[id]/route.ts` | Buyer PATCH |
-| `src/app/api/products/route.ts` | Products list + create |
+| `src/app/api/products/route.ts` | Products list + create (free plan: blocks at 10 total) |
 | `src/app/api/products/[id]/route.ts` | Product PATCH |
-| `src/app/api/invoices/route.ts` | Invoices list (left-joins customers) + create |
-| `src/app/api/invoices/[id]/route.ts` | Invoice payment PATCH — updates paidCash/paidOnline split, appends paymentHistory entry |
-| `src/components/Navbar.tsx` | Menu, scramble animation, slide-in panel, auth guard |
+| `src/app/api/invoices/route.ts` | Invoices list (left-joins customers) + create (free plan: blocks at 4/month) |
+| `src/app/api/invoices/[id]/route.ts` | Invoice payment PATCH — pre-checks email cap, returns `emailSkipped` |
+| `src/components/Navbar.tsx` | Menu, scramble animation, slide-in panel. All links require auth when signed out. Plan badge (FREE/PLUS/PRO) shown next to UserButton via `useAuth().has()` |
 | `src/components/HeroSection.tsx` | Video hero, flip transition, welcome overlay |
 | `src/components/CustomCursor.tsx` | Spring-physics custom cursor |
 | `src/inngest/client.ts` | Inngest client (`id: 'duemate'`) |
-| `src/inngest/functions.ts` | 3 background functions (invoice created, payment recorded, overdue cron) |
+| `src/inngest/functions.ts` | 3 background functions — each checks free plan email cap before sending, logs to `notifications` table + stamps `customers.lastEmailSentAt` after every send |
 | `src/app/api/inngest/route.ts` | Inngest webhook handler — serves all 3 functions |
 | `src/emails/InvoiceCreatedEmail.tsx` | Invoice notification email template |
 | `src/emails/PaymentReceiptEmail.tsx` | Payment receipt email template |
@@ -197,11 +212,23 @@ Functions: `src/inngest/functions.ts`
 
 | Function ID | Trigger | Action |
 |---|---|---|
-| `notify-owner-invoice-created` | event `invoice/created` | Sends `InvoiceCreatedEmail` to buyer via Resend |
-| `notify-owner-payment-recorded` | event `invoice/payment.recorded` | Sends `PaymentReceiptEmail` to buyer via Resend |
-| `check-overdue-invoices` | cron `30 5 * * *` (11:00 AM IST) | Marks pending→overdue; sends `PaymentDueReminderEmail` per buyer (grouped by customerId) |
+| `notify-owner-invoice-created` | event `invoice/created` | Checks email cap → sends `InvoiceCreatedEmail` → logs to notifications + stamps `lastEmailSentAt` |
+| `notify-owner-payment-recorded` | event `invoice/payment.recorded` | Checks email cap → sends `PaymentReceiptEmail` → logs to notifications + stamps `lastEmailSentAt` |
+| `check-overdue-invoices` | cron `30 5 * * *` (11:00 AM IST) | Marks pending→overdue; checks email cap per buyer; sends `PaymentDueReminderEmail` grouped by customerId; logs each send |
 
 Events are fired **non-blocking** from API routes: `inngest.send({...}).catch(...)` — email failure never breaks the API response. Events are skipped silently if the buyer has no email.
+
+### Inngest Email Cap (Free Plan)
+Each function runs `isEmailCapped(userId, recipientEmail)` as the first step:
+1. Fetches `users.plan` — if not `'free'`, skips cap check entirely
+2. Counts `notifications` rows for `(userId, recipient, sentAt >= startOfMonth)`
+3. If count ≥ 3 → returns `{ skipped: true, reason: 'free_plan_cap' }` without sending
+
+After a successful send, `logEmail(userId, recipient, subject, externalId)` runs in parallel:
+- Inserts into `notifications` (status: `'delivered'`, externalId = Resend's email ID)
+- Updates `customers.lastEmailSentAt = now` where `userId + email` match
+
+Both the `invoice/created` and `invoice/payment.recorded` events **must include `userId`** in their data payload — this is added in the respective API routes before calling `inngest.send()`.
 
 ## Email Templates (fully implemented)
 
@@ -254,12 +281,18 @@ Stored in `.env` at project root (not `.env.local`). Add to Vercel dashboard man
 - **App**: `NEXT_PUBLIC_APP_URL`
 
 ## Pricing Tiers
-| Feature | Free | Starter $9/mo | Pro $29/mo |
+
+Plans in UI: **Free / Plus / Pro**. DB `plan` enum: `'free' | 'starter' | 'pro'` — `'starter'` is the DB value for "Plus". Clerk Billing manages subscriptions; plans are configured in the Clerk Dashboard. The `/pricing` page uses Clerk's `<PricingTable />` component (requires auth).
+
+| Feature | Free | Plus (DB: starter) $9/mo | Pro $29/mo |
 |---|---|---|---|
-| Invoices | 10/mo | 100/mo | Unlimited |
-| Customers | 10 | 200 | Unlimited |
-| Email Reminders | 3/invoice | 7/invoice | 7/invoice |
+| Invoices | **4/mo** | 100/mo | Unlimited |
+| Customers | 10 total | 200 total | Unlimited |
+| Products | 10 total | Unlimited | Unlimited |
+| Emails per buyer | **3/month** | Unlimited | Unlimited |
 | WhatsApp | No | Yes | Yes |
 | AI Extraction | No | 50/mo | Unlimited |
 | Zoho Books Sync | No | No | Yes |
 | Team Members | 1 | 1 | Up to 5 |
+
+**Enforcement is live in code.** The plan badge (FREE/PLUS/PRO glow pill) is shown in the Navbar next to `<UserButton />` using `useAuth().has({ plan: '...' })` from Clerk Billing.
