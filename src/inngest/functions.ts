@@ -57,8 +57,10 @@ async function logEmail(userId: string, recipient: string, subject: string, exte
   ]);
 }
 
-/** Check if user is on free plan and has hit the monthly cap for this buyer */
-async function isEmailCapped(userId: string, recipient: string): Promise<boolean> {
+/** Check if user is on free plan and has hit the monthly cap for this buyer.
+ *  cap defaults to FREE_EMAIL_CAP (3). Pass FREE_EMAIL_CAP - 1 (2) for payment
+ *  receipts to reserve the last slot for the due-payment reminder. */
+async function isEmailCapped(userId: string, recipient: string, cap = FREE_EMAIL_CAP): Promise<boolean> {
   const rows = await db
     .select({ plan: users.plan })
     .from(users)
@@ -66,7 +68,7 @@ async function isEmailCapped(userId: string, recipient: string): Promise<boolean
     .limit(1);
   if (!rows.length || rows[0].plan !== 'free') return false;
   const count = await emailCountThisMonth(userId, recipient);
-  return count >= FREE_EMAIL_CAP;
+  return count >= cap;
 }
 
 /* ── 1. Invoice Created ───────────────────────────────────────────── */
@@ -120,8 +122,9 @@ export const notifyOwnerOnPayment = inngest.createFunction(
       : `Payment of ${d.paymentAmount} received — Invoice #${d.invoiceNumber}`;
 
     // Step 1: Check free plan monthly email cap
+    // Use FREE_EMAIL_CAP - 1 so the last slot is always reserved for the due-payment reminder
     const capped = await step.run('check-email-cap', async () =>
-      isEmailCapped(userId, customerEmail)
+      isEmailCapped(userId, customerEmail, FREE_EMAIL_CAP - 1)
     );
     if (capped) {
       return { skipped: true, reason: 'free_plan_cap', cap: FREE_EMAIL_CAP };

@@ -135,7 +135,8 @@ export async function PATCH(
             eq(notifications.recipient, customerEmail),
             gte(notifications.sentAt, startOfMonth),
           ));
-        if (total >= 3) emailSkipped = true;
+        // Reserve last email slot for the due-payment reminder
+        if (total >= 2) emailSkipped = true;
       }
     }
 
