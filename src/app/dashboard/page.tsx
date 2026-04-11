@@ -2189,11 +2189,12 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
                                   <input
                                     type="number"
                                     min={0.01}
+                                    max={balance}
                                     step="0.01"
                                     value={payDraft.amount}
                                     onChange={(e) => setPayDraft((d) => ({ ...d, amount: e.target.value }))}
                                     placeholder={`Amount (max ${sym}${balance.toLocaleString("en-IN")})`}
-                                    style={{ background: "#FAF8F4", border: "1.5px solid rgba(0,0,0,0.1)", borderRadius: "7px", padding: "9px 12px", fontFamily: "var(--font-body)", fontSize: "14px", color: "#1C1B2E", outline: "none", flex: 1, minWidth: "140px" }}
+                                    style={{ background: "#FAF8F4", border: `1.5px solid ${payDraft.amount && Number(payDraft.amount) > balance + 0.001 ? "#D97706" : "rgba(0,0,0,0.1)"}`, borderRadius: "7px", padding: "9px 12px", fontFamily: "var(--font-body)", fontSize: "14px", color: "#1C1B2E", outline: "none", flex: 1, minWidth: "140px" }}
                                   />
                                   <select
                                     aria-label="Payment type"
@@ -2206,6 +2207,11 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
                                     <option value="online">Online</option>
                                   </select>
                                 </div>
+                                {payDraft.amount && Number(payDraft.amount) > balance + 0.001 && (
+                                  <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: "#D97706", marginTop: "-4px" }}>
+                                    Max payable is {sym}{balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </p>
+                                )}
                                 <input
                                   type="text"
                                   value={payDraft.reference}

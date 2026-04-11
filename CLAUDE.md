@@ -79,12 +79,13 @@ Fluid type scale in `:root` via `clamp()` — `--text-xs` through `--text-hero`.
 - Use `useUser()` hook in client components to read auth state
 - Call `getOrCreateUser()` from `src/lib/auth.ts` at the top of every authenticated API route — lazy DB user creation on first API call, no webhook sync needed
 
-## Database — 7 Tables (live on Neon)
+## Database — 8 Tables (live on Neon)
 
 Schema: `src/lib/schema.ts` | Client: `src/lib/db.ts` (Neon HTTP driver) | Config: `drizzle.config.ts`
 
 - **users** — Clerk userId (text PK), email, name, businessName, plan (`planEnum`: `'free' | 'starter' | 'pro'` — `'starter'` is the DB value for the "Plus" plan shown in UI), timezone
 - **customers** — uuid PK, userId FK, name, email (required), shopName (required), phone, gstin (15-char GSTIN format), **lastEmailSentAt** (timestamp, nullable — stamped every time an email is sent to this buyer)
+- **suppliers** — uuid PK, userId FK, name, shopName, phone, gstin — reusable supplier records; selected in the product form to auto-fill supplierShop/Phone/Gstin
 - **products** — uuid PK, userId FK, name, description, rate (selling price), unit, quantity (stock), gstRate, purchaseRate, purchaseDate, supplierShop, supplierPhone, supplierGstin, hsnCode
 - **invoices** — uuid PK, userId FK, customerId FK, invoiceNumber, amount, currency, dueDate, issueDate, status (pending/due_soon/overdue/paid/cancelled), discountType/discountAmount, taxRate/taxAmount, paymentType, paidAmount, paidCash, paidOnline, balanceAmount, paidAt, lastPaymentAt, paymentReference, paymentNotes, notes, extractedData (jsonb — stores line items array), paymentHistory (jsonb array of `{amount, type, reference, notes, paidAt}`), fileUrl, aiConfidence
 - **reminders** — uuid PK, invoiceId FK, type, channel (email/whatsapp/both), scheduledAt, sentAt, status, messageBody, error
@@ -107,7 +108,7 @@ Large client component (`'use client'`). All tabs live in one file. Redirects to
 Three tabs rendered by `<DashboardTabs>` → each tab is its own function component defined in the same file:
 
 - **I. Buyers (`CustomersSection`)** — Add/edit/list buyers. Inline row edit with `editingId` state. Validation: phone must be 10 digits (`/^\d{10}$/`), GSTIN must match `/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/`. `validateBuyerFields()` is a module-level shared validator.
-- **II. Products (`ProductsSection` + `ProductCard`)** — Add products via form; each saved product renders as a `ProductCard` with inline edit (`editing` state inside the card). Form order: Purchase Rate → Selling Rate. Purchase Total auto-computes from `purchaseRate × quantity × (1 + gstRate/100)`. ProductCard view shows margin % (selling − purchase rate).
+- **II. Products (`ProductsSection` + `ProductCard`)** — Includes a **Saved Suppliers** sub-section (add/edit/list) above the product form, plus a "Auto-fill from Saved Supplier" dropdown that fills supplierShop/Phone/Gstin on select. Add products via form; each saved product renders as a `ProductCard` with inline edit (`editing` state inside the card). Form order: Purchase Rate → Selling Rate. Purchase Total auto-computes from `purchaseRate × quantity × (1 + gstRate/100)`. ProductCard view shows margin % (selling − purchase rate).
 - **III. Sales (`SalesSection` + `InvoiceList`)** — Invoice creation form with preview modal before saving. `InvoiceList` renders saved invoices as expandable rows. Expanded panel shows full financial breakdown + **Record Payment** inline form (calls `PATCH /api/invoices/[id]`).
 
 ### Dashboard Internal Components
@@ -148,6 +149,8 @@ All routes call `getOrCreateUser()` first, validate with Zod, return `{ success,
 | `/api/products/[id]` | PATCH | Update product + stock |
 | `/api/invoices` | GET, POST | List (with customer join) / create invoices |
 | `/api/invoices/[id]` | PATCH | Record payment — adds `additionalPayment` to `paidAmount`/`paidCash`/`paidOnline`, appends to `paymentHistory`, sets `lastPaymentAt`, optionally stores `paymentReference`/`paymentNotes`. Sets status to `"paid"` when balance reaches zero. Returns `emailSkipped: boolean` to indicate whether the receipt email was suppressed by the free plan cap. |
+| `/api/suppliers` | GET, POST | List / create suppliers |
+| `/api/suppliers/[id]` | PATCH | Update supplier details |
 
 ### Free Plan Enforcement
 POST routes for customers, products, and invoices check `user.plan === 'free'` and return a 403 with `{ success: false, planLimit: true, limit, used, remaining, resource }` when limits are hit. Dashboard detects `json.planLimit` and shows `PlanLimitCard` instead of a plain error.
@@ -175,6 +178,8 @@ The `PATCH /api/invoices/[id]` route pre-checks the email cap synchronously befo
 | `src/app/pricing/page.tsx` | Pricing page — server component, requires auth (`auth()` redirect), renders Clerk `<PricingTable />` |
 | `src/app/dashboard/page.tsx` | Dashboard — all tabs + internal components (1 large file) |
 | `src/app/api/customers/route.ts` | Buyers list + create (free plan: blocks at 10 total) |
+| `src/app/api/suppliers/route.ts` | Suppliers list + create |
+| `src/app/api/suppliers/[id]/route.ts` | Supplier PATCH |
 | `src/app/api/customers/[id]/route.ts` | Buyer PATCH |
 | `src/app/api/products/route.ts` | Products list + create (free plan: blocks at 10 total) |
 | `src/app/api/products/[id]/route.ts` | Product PATCH |
@@ -219,10 +224,12 @@ Functions: `src/inngest/functions.ts`
 Events are fired **non-blocking** from API routes: `inngest.send({...}).catch(...)` — email failure never breaks the API response. Events are skipped silently if the buyer has no email.
 
 ### Inngest Email Cap (Free Plan)
-Each function runs `isEmailCapped(userId, recipientEmail)` as the first step:
+`isEmailCapped(userId, recipientEmail, cap = FREE_EMAIL_CAP)` is called as the first step in each function:
 1. Fetches `users.plan` — if not `'free'`, skips cap check entirely
 2. Counts `notifications` rows for `(userId, recipient, sentAt >= startOfMonth)`
-3. If count ≥ 3 → returns `{ skipped: true, reason: 'free_plan_cap' }` without sending
+3. If `count >= cap` → returns `{ skipped: true, reason: 'free_plan_cap' }` without sending
+
+**Reserved slot logic:** `notify-owner-payment-recorded` passes `cap = FREE_EMAIL_CAP - 1` (= **2**), reserving the 3rd monthly slot exclusively for the overdue reminder cron. The PATCH `/api/invoices/[id]` pre-check mirrors this (`total >= 2` → `emailSkipped = true`). Effective per-buyer email sequence on free plan: slot 1 = invoice created, slot 2 = payment receipt (max 1), slot 3 = due reminder.
 
 After a successful send, `logEmail(userId, recipient, subject, externalId)` runs in parallel:
 - Inserts into `notifications` (status: `'delivered'`, externalId = Resend's email ID)
