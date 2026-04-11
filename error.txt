@@ -1,0 +1,151 @@
+# DueMate Pricing Plans — Go / Plus / Pro
+
+---
+
+## PLAN OVERVIEW
+
+| Feature                        | Free            | Plus             | Pro               |
+|-------------------------------|-----------------|------------------|-------------------|
+| **Monthly (USD)**             | $0              | $9 / mo          | $29 / mo          |
+| **Yearly (USD)**              | $0              | $79 / yr ($6.6)  | $249 / yr ($20.7) |
+| **Monthly (INR)**             | ₹0              | ₹749 / mo        | ₹2,399 / mo       |
+| **Yearly (INR)**              | ₹0              | ₹6,599 / yr      | ₹19,999 / yr      |
+| **Yearly Savings**            | —               | Save 26%         | Save 29%          |
+
+---
+
+## FREE — Free Forever
+
+Perfect for freelancers just getting started.
+
+### Limits
+- Invoices: 4 / month
+- Customers (Buyers): 10 total
+- Products: 10 total
+- Email Reminders: 1 per invoice
+- Insights / Analytics: Basic only (last 30 days)
+- Payment History: Last 3 payments per invoice
+
+### Restrictions to Implement in Code
+- Block invoice creation when count >= 4 in current month
+- Block customer creation when count >= 10
+- Block product creation when count >= 10
+- Show upgrade banner on insights page after 15 days
+- Limit payment history display to 3 entries
+
+---
+
+## PLUS — $9/mo | ₹749/mo (Most Popular)
+
+Best for small businesses and growing shops.
+
+### Limits
+- Invoices: 100 / month
+- Customers (Buyers): 200 total
+- Products: Unlimited
+- Email Reminders: 7 per invoice (all 7 timing slots)
+- Insights / Analytics: Full (all time, all charts)
+- Payment History: Unlimited
+- Priority Support: Email support (48hr response)
+
+### Restrictions to Implement in Code
+- Block invoice creation when count >= 100 in current month
+- Block customer creation when count >= 200
+- Block AI extraction when monthly usage >= 50
+- Hide Zoho connect button in integrations
+- Limit team members to 1
+
+---
+
+## PRO — $29/mo | ₹2,399/mo
+
+For established businesses needing full automation.
+
+### Limits
+- Invoices: Unlimited
+- Customers (Buyers): Unlimited
+- Products: Unlimited
+- Email Reminders: 7 per invoice (all 7 timing slots)
+- AI Invoice Extraction: Unlimited
+- WhatsApp Reminders: YES (Meta Cloud API)
+- Zoho Books Sync: YES (full OAuth sync)
+- Team Members: Up to 5
+- Insights / Analytics: Full + export reports
+- Payment History: Unlimited
+- Export (PDF/CSV): YES
+- Custom Sender Name: YES
+- Priority Support: Priority email + chat (24hr response)
+- Custom Reminder Message: YES (per invoice)
+- Overdue Auto-Escalation: YES (daily reminders after 7 days overdue)
+
+### Restrictions to Implement in Code
+- No limits on invoices, customers, products, AI
+- Enable Zoho Books sync (show connect button)
+- Allow up to 5 team member seats (future: team table)
+- Show all analytics date ranges
+- Enable custom message field in reminder settings
+
+---
+
+## YEARLY DISCOUNT LOGIC
+
+Plus Yearly:  $79/yr  vs $108/yr (monthly×12) → saves $29 → 26% off
+Pro Yearly:   $249/yr vs $348/yr (monthly×12) → saves $99 → 28% off
+
+INR Plus Yearly:  ₹6,599/yr  vs ₹8,988/yr → saves ₹2,389 → 26% off
+INR Pro Yearly:   ₹19,999/yr vs ₹28,788/yr → saves ₹8,789 → 30% off
+
+---
+
+## FEATURE GATES — Where to Add Checks in Code
+
+### 1. src/app/api/invoices/route.ts (POST)
+   - Count invoices created this month for userId
+   - Free: block if >= 10, return 403 with { error: 'PLAN_LIMIT', limit: 10, plan: 'free' }
+   - Plus: block if >= 100
+
+### 2. src/app/api/customers/route.ts (POST)
+   - Count total customers for userId
+   - Free: block if >= 10
+   - Plus: block if >= 200
+
+### 3. src/app/api/products/route.ts (POST)
+   - Count total products for userId
+   - Free: block if >= 10
+
+### 4. src/app/api/ai-extract/route.ts (POST) [future]
+   - Count AI extractions this month
+   - Free: block entirely
+   - Plus: block if >= 50
+
+### 5. src/app/dashboard/page.tsx (UI gates)
+   - Check user.plan and hide/disable:
+     - WhatsApp toggle (free plan)
+     - AI extract button (free plan)
+     - Zoho connect card (go + plus plan)
+     - Show <UpgradeBanner> when limit approached (>80% used)
+
+### 6. src/lib/schema.ts
+   - users.plan column already exists: 'free' | 'starter' | 'pro'
+   - Rename enum values to: 'free' | 'plus' | 'pro' OR map 'free'→'free', 'starter'→'plus'
+
+---
+
+## UPGRADE PROMPT UX
+
+- When a free user hits a limit: show modal "You've hit the Go plan limit. Upgrade to Plus for 100 invoices/month."
+- Show a soft warning at 80% of limit (e.g., 8/10 invoices used)
+- Add a subtle "Upgrade" badge in the nav for free users
+- Insights page: blur Pro-only charts for Go/Plus users with "Upgrade to unlock"
+
+---
+
+## PAYMENT PROCESSOR (to integrate)
+
+India-first: Razorpay (supports INR subscriptions natively)
+International: Stripe (supports USD, EUR, GBP)
+
+Recommended: Start with Razorpay for INR, add Stripe for USD later.
+Razorpay Subscription Plans API → store subscription_id in users table.
+
+---

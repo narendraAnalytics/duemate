@@ -4,13 +4,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { UserButton, Show, useUser } from "@clerk/nextjs";
+import { UserButton, Show, useUser, useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
 const NAV_LINKS = [
   { href: "#features",     label: "Features",     numeral: "I" },
   { href: "#how-it-works", label: "How It Works", numeral: "II" },
-  { href: "#pricing",      label: "Pricing",      numeral: "III" },
+  { href: "/pricing",      label: "Pricing",      numeral: "III" },
   { href: "/dashboard",    label: "Dashboard",    numeral: "IV" },
 ];
 
@@ -58,11 +58,24 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { text: menuText, scramble, reset } = useTextScramble("Menu");
   const { isSignedIn } = useUser();
+  const { has } = useAuth();
   const router = useRouter();
+
+  const planLabel = has?.({ plan: "pro" })
+    ? "PRO"
+    : has?.({ plan: "plus" })
+    ? "PLUS"
+    : "FREE";
+  const planColor =
+    planLabel === "PRO"
+      ? "#10B981"
+      : planLabel === "PLUS"
+      ? "#818CF8"
+      : "#F59E0B";
 
   const handleNavClick = (href: string) => {
     setMenuOpen(false);
-    if (!isSignedIn) {
+    if (!isSignedIn && href === "/dashboard") {
       router.push("/sign-in");
       return;
     }
@@ -118,9 +131,28 @@ export default function Navbar() {
             />
           </button>
 
-          {/* UserButton — visible after Menu when signed in */}
+          {/* Plan badge + UserButton — visible when signed in */}
           <Show when="signed-in">
-            <UserButton />
+            <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "0.62rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.14em",
+                  color: planColor,
+                  border: `1px solid ${planColor}`,
+                  borderRadius: "9999px",
+                  padding: "2px 9px",
+                  lineHeight: 1.6,
+                  textShadow: `0 0 10px ${planColor}99`,
+                  boxShadow: `0 0 6px ${planColor}33`,
+                }}
+              >
+                {planLabel}
+              </span>
+              <UserButton />
+            </div>
           </Show>
         </nav>
       </header>
