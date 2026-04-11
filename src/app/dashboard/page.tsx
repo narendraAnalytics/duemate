@@ -267,6 +267,90 @@ function SectionHeading({ title, sub }: { title: string; sub?: string }) {
   );
 }
 
+// ─── Plan Usage Bar ───────────────────────────────────────────────────────────
+
+function PlanUsageBar({ used, limit, label }: { used: number; limit: number; label: string }) {
+  const pct = Math.min(100, Math.round((used / limit) * 100));
+  const isAtLimit = pct >= 100;
+  const isWarning = pct >= 75 && !isAtLimit;
+  const barColor = isAtLimit ? "#EF4444" : isWarning ? "#F59E0B" : "#3B82F6";
+  const bg = isAtLimit ? "#FEF2F2" : isWarning ? "#FFFBEB" : "#EFF6FF";
+  const border = isAtLimit ? "#FECACA" : isWarning ? "#FDE68A" : "#BFDBFE";
+  const textColor = isAtLimit ? "#991B1B" : isWarning ? "#92400E" : "#1E40AF";
+
+  return (
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: "10px", padding: "10px 14px", marginBottom: "18px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 700, color: textColor, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+          Free Plan · {label}
+        </span>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: textColor, fontWeight: 700 }}>
+          {used} / {limit}
+        </span>
+      </div>
+      <div style={{ background: "rgba(0,0,0,0.07)", borderRadius: "9999px", height: "5px", overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: "9999px", transition: "width 0.4s ease" }} />
+      </div>
+      <p style={{ fontFamily: "var(--font-body)", fontSize: "11px", color: textColor, marginTop: "5px", opacity: 0.85 }}>
+        {isAtLimit ? "Limit reached — upgrade to add more" : `${limit - used} ${label.toLowerCase()} remaining this ${label === "Invoices this month" ? "month" : "plan"}`}
+      </p>
+    </div>
+  );
+}
+
+// ─── Plan Limit Card ──────────────────────────────────────────────────────────
+
+function PlanLimitCard({ resource, limit, onDismiss }: { resource: string; limit: number; onDismiss: () => void }) {
+  const copy: Record<string, { title: string; detail: string }> = {
+    customer: { title: "Buyer limit reached", detail: `You've used all ${limit} buyer slots on the Free plan.` },
+    product: { title: "Product limit reached", detail: `You've used all ${limit} product slots on the Free plan.` },
+    invoice: { title: "Invoice limit reached", detail: `You've created ${limit} invoices this month on the Free plan.` },
+  };
+  const { title, detail } = copy[resource] ?? { title: "Free plan limit reached", detail: "You've hit the Free plan limit." };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      style={{
+        background: "#EFF6FF",
+        border: "1.5px solid #BFDBFE",
+        borderRadius: "12px",
+        padding: "16px 18px",
+        display: "flex",
+        gap: "12px",
+        alignItems: "flex-start",
+        marginBottom: "16px",
+      }}
+    >
+      <span style={{ fontSize: "1.4rem", lineHeight: 1, marginTop: "1px" }}>🔒</span>
+      <div style={{ flex: 1 }}>
+        <p style={{ fontFamily: "var(--font-body)", fontWeight: 700, fontSize: "14px", color: "#1D4ED8", marginBottom: "4px" }}>
+          {title}
+        </p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: "#2563EB", marginBottom: "12px", lineHeight: 1.5 }}>
+          {detail} Upgrade to Plus for higher limits.
+        </p>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <a
+            href="/pricing"
+            style={{ background: "#2563EB", color: "#fff", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, letterSpacing: "0.05em", padding: "7px 16px", borderRadius: "8px", textDecoration: "none" }}
+          >
+            Upgrade to Plus →
+          </a>
+          <button
+            type="button"
+            onClick={onDismiss}
+            style={{ background: "none", border: "none", color: "#93C5FD", fontSize: "12px", cursor: "pointer", fontFamily: "var(--font-body)" }}
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Customers Section ────────────────────────────────────────────────────────
 
 function validateBuyerFields(f: { name: string; shopName: string; email: string; phone: string; gstin: string }): string {
@@ -289,6 +373,7 @@ function CustomersSection() {
   const [editDraft, setEditDraft] = useState({ name: "", email: "", shopName: "", phone: "", gstin: "" });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
+  const [planLimitInfo, setPlanLimitInfo] = useState<{ resource: string; limit: number } | null>(null);
 
   const fetchList = useCallback(async () => {
     setFetching(true);
@@ -320,6 +405,8 @@ function CustomersSection() {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
       fetchList();
+    } else if (json.planLimit) {
+      setPlanLimitInfo({ resource: json.resource, limit: json.limit });
     } else {
       setError(typeof json.error === "string" ? json.error : "Failed to save.");
     }
@@ -365,6 +452,11 @@ function CustomersSection() {
           border: `1px solid ${D.borderFaint}`,
         }}
       >
+        <PlanUsageBar used={list.length} limit={10} label="Buyers" />
+        {planLimitInfo && (
+          <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} />
+        )}
+
         <form
           onSubmit={handleSubmit}
           style={{ display: "flex", flexDirection: "column", gap: "20px" }}
@@ -997,6 +1089,7 @@ function ProductsSection() {
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [planLimitInfo, setPlanLimitInfo] = useState<{ resource: string; limit: number } | null>(null);
 
   const fetchList = useCallback(async () => {
     setFetching(true);
@@ -1050,6 +1143,8 @@ function ProductsSection() {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
       fetchList();
+    } else if (json.planLimit) {
+      setPlanLimitInfo({ resource: json.resource, limit: json.limit });
     } else {
       setError(typeof json.error === "string" ? json.error : "Failed to save.");
     }
@@ -1065,6 +1160,11 @@ function ProductsSection() {
         title="Add Product"
         sub="Define the goods or materials you sell with their rates"
       />
+
+      <PlanUsageBar used={list.length} limit={10} label="Products" />
+      {planLimitInfo && (
+        <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} />
+      )}
 
       {/* Form card */}
       <div
@@ -1523,6 +1623,7 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
   const [printInvoice, setPrintInvoice] = useState<InvoiceRow | null>(null);
   const [lastPaidId, setLastPaidId] = useState<string | null>(null);
   const [paySuccessEmail, setPaySuccessEmail] = useState<string | null>(null);
+  const [emailSkippedId, setEmailSkippedId] = useState<string | null>(null);
 
   async function handleRecordPayment(inv: InvoiceRow) {
     const amt = Number(payDraft.amount);
@@ -1540,7 +1641,13 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
     setPayLoading(false);
     if (json.success) {
       setLastPaidId(inv.id);
-      setPaySuccessEmail(inv.customerEmail ?? null);
+      if (json.emailSkipped) {
+        setEmailSkippedId(inv.id);
+        setPaySuccessEmail(null);
+      } else {
+        setPaySuccessEmail(inv.customerEmail ?? null);
+        setEmailSkippedId(null);
+      }
       setPayingId(null);
       setPayDraft({ amount: "", type: "cash", reference: "", notes: "" });
       onRefresh();
@@ -1834,11 +1941,29 @@ function InvoiceList({ invoiceList, fetching, onRefresh }: { invoiceList: Invoic
                                   <span style={{ fontSize: "15px", color: "#16A34A" }}>✓</span>
                                   <span style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: "#16A34A" }}>
                                     Payment recorded
-                                    {paySuccessEmail
+                                    {paySuccessEmail && !emailSkippedId
                                       ? <> · Receipt sent to <strong>{paySuccessEmail}</strong></>
                                       : ""}
                                   </span>
                                 </div>
+
+                                {/* Free plan email cap notice */}
+                                {emailSkippedId === inv.id && (
+                                  <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", background: "#EFF6FF", border: "1.5px solid #BFDBFE", borderRadius: "8px", padding: "10px 14px" }}>
+                                    <span style={{ fontSize: "1rem", lineHeight: 1, marginTop: "1px" }}>🔒</span>
+                                    <div>
+                                      <p style={{ fontFamily: "var(--font-body)", fontSize: "13px", fontWeight: 700, color: "#1D4ED8", marginBottom: "2px" }}>
+                                        Receipt email not sent — Free plan limit
+                                      </p>
+                                      <p style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: "#3B82F6", lineHeight: 1.5 }}>
+                                        You&apos;ve reached 3 emails/buyer this month on the Free plan.{" "}
+                                        <a href="/pricing" style={{ color: "#2563EB", fontWeight: 700, textDecoration: "none" }}>
+                                          Upgrade to Plus →
+                                        </a>
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); setPrintInvoice(inv); setLastPaidId(null); setPaySuccessEmail(null); }}
@@ -1997,6 +2122,7 @@ function SalesSection() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successEmail, setSuccessEmail] = useState<string | null>(null);
+  const [planLimitInfo, setPlanLimitInfo] = useState<{ resource: string; limit: number } | null>(null);
 
   const fetchAll = useCallback(async () => {
     setFetching(true);
@@ -2108,11 +2234,20 @@ function SalesSection() {
       setSuccessEmail(buyerEmail ?? "");
       setTimeout(() => setSuccessEmail(null), 5000);
       fetchAll();
+    } else if (json.planLimit) {
+      setShowPreview(false);
+      setPlanLimitInfo({ resource: json.resource, limit: json.limit });
     } else {
       setShowPreview(false);
       setError(typeof json.error === "string" ? json.error : "Failed to create invoice.");
     }
   }
+
+  const now = new Date();
+  const invoicesThisMonth = invoiceList.filter((inv) => {
+    const d = new Date(inv.createdAt);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }).length;
 
   const currSymbol = form.currency === "USD" ? "$" : form.currency === "EUR" ? "€" : "₹";
   const paidPreview = form.paidAmount ? Math.min(Number(form.paidAmount), total) : 0;
@@ -2332,6 +2467,11 @@ function SalesSection() {
         title="Create Invoice"
         sub="Pick a buyer, add products, set a due date — DueMate handles the reminders"
       />
+
+      <PlanUsageBar used={invoicesThisMonth} limit={4} label="Invoices this month" />
+      {planLimitInfo && (
+        <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} />
+      )}
 
       {/* ── Invoice Form Card ── */}
       <div style={{

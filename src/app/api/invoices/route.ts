@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { invoices, customers, products } from "@/lib/schema";
 import { getOrCreateUser } from "@/lib/auth";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, gte } from "drizzle-orm";
 import { inngest } from "@/inngest/client";
 
 const lineItemSchema = z.object({
@@ -115,6 +115,22 @@ export async function POST(req: NextRequest) {
       paidAmount,
       extractedData,
     } = parsed.data;
+
+    // Free plan: max 4 invoices per month
+    if (user.plan === "free") {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const [{ total }] = await db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(invoices)
+        .where(and(eq(invoices.userId, user.id), gte(invoices.createdAt, startOfMonth)));
+      if (total >= 4) {
+        return NextResponse.json(
+          { success: false, planLimit: true, limit: 4, used: total, remaining: 0, resource: "invoice" },
+          { status: 403 }
+        );
+      }
+    }
 
     // Uniqueness check
     const existing = await db
@@ -232,6 +248,7 @@ export async function POST(req: NextRequest) {
             businessName: user.businessName ?? user.name ?? 'Business',
             ownerName: user.name ?? user.businessName ?? 'Business Owner',
             ownerEmail: user.email,
+            userId: user.id,
             notes: notes ?? '',
             appUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'https://duemate-opal.vercel.app',
           },

@@ -62,6 +62,7 @@ export const customers = pgTable("customers", {
   shopName: text("shop_name"),
   phone: text("phone"),
   gstin: text("gstin"),
+  lastEmailSentAt: timestamp("last_email_sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

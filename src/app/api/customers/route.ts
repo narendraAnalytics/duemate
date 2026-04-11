@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { customers } from "@/lib/schema";
 import { getOrCreateUser } from "@/lib/auth";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 const createSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -42,6 +42,20 @@ export async function POST(req: NextRequest) {
         { success: false, error: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
+    }
+
+    // Free plan: max 10 customers
+    if (user.plan === "free") {
+      const [{ total }] = await db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(customers)
+        .where(eq(customers.userId, user.id));
+      if (total >= 10) {
+        return NextResponse.json(
+          { success: false, planLimit: true, limit: 10, used: total, remaining: 0, resource: "customer" },
+          { status: 403 }
+        );
+      }
     }
 
     const { name, email, shopName, phone, gstin } = parsed.data;

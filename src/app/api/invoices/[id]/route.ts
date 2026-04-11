@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { invoices, customers, PaymentHistoryEntry } from "@/lib/schema";
+import { invoices, customers, users, notifications, PaymentHistoryEntry } from "@/lib/schema";
 import { getOrCreateUser } from "@/lib/auth";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql, gte } from "drizzle-orm";
 import { inngest } from "@/inngest/client";
 
 const paymentSchema = z.object({
@@ -117,8 +117,30 @@ export async function PATCH(
       }
     }
 
-    // Fire Inngest event only if buyer has an email
+    // Check free plan email cap before firing (so response can inform the UI)
+    let emailSkipped = false;
     if (customerEmail) {
+      const userRows = await db
+        .select({ plan: users.plan })
+        .from(users)
+        .where(eq(users.id, user.id))
+        .limit(1);
+      if (userRows[0]?.plan === 'free') {
+        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        const [{ total }] = await db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(notifications)
+          .where(and(
+            eq(notifications.userId, user.id),
+            eq(notifications.recipient, customerEmail),
+            gte(notifications.sentAt, startOfMonth),
+          ));
+        if (total >= 3) emailSkipped = true;
+      }
+    }
+
+    // Fire Inngest event only if buyer has an email and not capped
+    if (customerEmail && !emailSkipped) {
       inngest
         .send({
           name: 'invoice/payment.recorded',
@@ -137,6 +159,7 @@ export async function PATCH(
             customerEmail,
             businessName: user.businessName ?? user.name ?? 'Business',
             ownerEmail: user.email,
+            userId: user.id,
             currency: inv.currency ?? 'INR',
             appUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'https://duemate-opal.vercel.app',
           },
@@ -144,7 +167,7 @@ export async function PATCH(
         .catch((err) => console.error('[Inngest] invoice/payment.recorded send failed:', err));
     }
 
-    return NextResponse.json({ success: true, data: updated });
+    return NextResponse.json({ success: true, data: updated, emailSkipped });
   } catch (err) {
     console.error("[PATCH /api/invoices/:id]", err);
     const msg = err instanceof Error ? err.message : "Unknown error";
