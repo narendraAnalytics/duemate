@@ -11,7 +11,7 @@ export async function getOrCreateUser() {
     // Clerk Billing is the source of truth for the plan
     let clerkPlan: 'free' | 'starter' | 'pro' = 'free';
     if (has({ plan: 'pro' })) clerkPlan = 'pro';
-    else if (has({ plan: 'starter' })) clerkPlan = 'starter';
+    else if (has({ plan: 'plus' })) clerkPlan = 'starter';
 
     const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 

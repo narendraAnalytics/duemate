@@ -278,7 +278,8 @@ function SectionHeading({ title, sub }: { title: string; sub?: string }) {
 
 // ─── Plan Usage Bar ───────────────────────────────────────────────────────────
 
-function PlanUsageBar({ used, limit, label }: { used: number; limit: number; label: string }) {
+function PlanUsageBar({ used, limit, label, plan }: { used: number; limit: number; label: string; plan?: string }) {
+  const planName = plan === 'pro' ? 'Pro Plan' : plan === 'starter' ? 'Plus Plan' : 'Free Plan';
   const pct = Math.min(100, Math.round((used / limit) * 100));
   const isAtLimit = pct >= 100;
   const isWarning = pct >= 75 && !isAtLimit;
@@ -291,7 +292,7 @@ function PlanUsageBar({ used, limit, label }: { used: number; limit: number; lab
     <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: "10px", padding: "10px 14px", marginBottom: "18px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
         <span style={{ fontFamily: "var(--font-body)", fontSize: "11px", fontWeight: 700, color: textColor, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-          Free Plan · {label}
+          {planName} · {label}
         </span>
         <span style={{ fontFamily: "var(--font-body)", fontSize: "12px", color: textColor, fontWeight: 700 }}>
           {used} / {limit}
@@ -470,7 +471,7 @@ function CustomersSection() {
         }}
       >
         {customerLimit !== Infinity && (
-          <PlanUsageBar used={list.length} limit={customerLimit} label="Buyers" />
+          <PlanUsageBar used={list.length} limit={customerLimit} label="Buyers" plan={userPlan} />
         )}
         {planLimitInfo && (
           <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} userPlan={userPlan} />
@@ -1341,7 +1342,7 @@ function ProductsSection() {
       </div>
 
       {productLimit !== Infinity && (
-        <PlanUsageBar used={list.length} limit={productLimit} label="Products" />
+        <PlanUsageBar used={list.length} limit={productLimit} label="Products" plan={userPlan} />
       )}
       {planLimitInfo && (
         <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} userPlan={userPlan} />
@@ -2689,7 +2690,7 @@ function SalesSection() {
       />
 
       {invoiceLimit !== Infinity && (
-        <PlanUsageBar used={invoicesThisMonth} limit={invoiceLimit} label="Invoices this month" />
+        <PlanUsageBar used={invoicesThisMonth} limit={invoiceLimit} label="Invoices this month" plan={userPlan} />
       )}
       {planLimitInfo && (
         <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} userPlan={userPlan} />

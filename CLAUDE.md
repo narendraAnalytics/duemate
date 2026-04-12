@@ -35,7 +35,7 @@ npx tsc --noEmit       # Type-check without building
   - **Bebas Neue** → `--font-display` / `font-heading` (headlines)
   - **Space Grotesk** → `--font-body` / `font-sans` (body)
   - **Cormorant Garamond** → `--font-serif` (menu numerals, italic accent text)
-- shadcn/ui — accessible pre-built components
+- /— accessible pre-built components
 - Lucide React — icons
 - React Hook Form + Zod — type-safe form validation
 
