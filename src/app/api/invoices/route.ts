@@ -116,17 +116,18 @@ export async function POST(req: NextRequest) {
       extractedData,
     } = parsed.data;
 
-    // Free plan: max 4 invoices per month
-    if (user.plan === "free") {
+    // Free plan: 4/month · Plus (starter): 100/month · Pro: unlimited
+    if (user.plan === "free" || user.plan === "starter") {
+      const limit = user.plan === "free" ? 4 : 100;
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const [{ total }] = await db
         .select({ total: sql<number>`count(*)::int` })
         .from(invoices)
         .where(and(eq(invoices.userId, user.id), gte(invoices.createdAt, startOfMonth)));
-      if (total >= 4) {
+      if (total >= limit) {
         return NextResponse.json(
-          { success: false, planLimit: true, limit: 4, used: total, remaining: 0, resource: "invoice" },
+          { success: false, planLimit: true, limit, used: total, remaining: 0, resource: "invoice" },
           { status: 403 }
         );
       }

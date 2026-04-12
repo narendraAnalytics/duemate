@@ -44,15 +44,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Free plan: max 10 customers
-    if (user.plan === "free") {
+    // Free plan: 10 total · Plus (starter): 200 total · Pro: unlimited
+    if (user.plan === "free" || user.plan === "starter") {
+      const limit = user.plan === "free" ? 10 : 200;
       const [{ total }] = await db
         .select({ total: sql<number>`count(*)::int` })
         .from(customers)
         .where(eq(customers.userId, user.id));
-      if (total >= 10) {
+      if (total >= limit) {
         return NextResponse.json(
-          { success: false, planLimit: true, limit: 10, used: total, remaining: 0, resource: "customer" },
+          { success: false, planLimit: true, limit, used: total, remaining: 0, resource: "customer" },
           { status: 403 }
         );
       }

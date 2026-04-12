@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
   ResponsiveContainer,
@@ -309,13 +309,15 @@ function PlanUsageBar({ used, limit, label }: { used: number; limit: number; lab
 
 // ─── Plan Limit Card ──────────────────────────────────────────────────────────
 
-function PlanLimitCard({ resource, limit, onDismiss }: { resource: string; limit: number; onDismiss: () => void }) {
+function PlanLimitCard({ resource, limit, onDismiss, userPlan }: { resource: string; limit: number; onDismiss: () => void; userPlan?: string }) {
+  const planName = userPlan === "starter" ? "Plus" : userPlan === "pro" ? "Pro" : "Free";
+  const upgradeTarget = userPlan === "starter" ? "Pro" : "Plus";
   const copy: Record<string, { title: string; detail: string }> = {
-    customer: { title: "Buyer limit reached", detail: `You've used all ${limit} buyer slots on the Free plan.` },
-    product: { title: "Product limit reached", detail: `You've used all ${limit} product slots on the Free plan.` },
-    invoice: { title: "Invoice limit reached", detail: `You've created ${limit} invoices this month on the Free plan.` },
+    customer: { title: "Buyer limit reached", detail: `You've used all ${limit} buyer slots on the ${planName} plan.` },
+    product: { title: "Product limit reached", detail: `You've used all ${limit} product slots on the ${planName} plan.` },
+    invoice: { title: "Invoice limit reached", detail: `You've created ${limit} invoices this month on the ${planName} plan.` },
   };
-  const { title, detail } = copy[resource] ?? { title: "Free plan limit reached", detail: "You've hit the Free plan limit." };
+  const { title, detail } = copy[resource] ?? { title: `${planName} plan limit reached`, detail: `You've hit the ${planName} plan limit.` };
 
   return (
     <motion.div
@@ -338,14 +340,14 @@ function PlanLimitCard({ resource, limit, onDismiss }: { resource: string; limit
           {title}
         </p>
         <p style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: "#2563EB", marginBottom: "12px", lineHeight: 1.5 }}>
-          {detail} Upgrade to Plus for higher limits.
+          {detail} Upgrade to {upgradeTarget} for higher limits.
         </p>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <a
             href="/pricing"
             style={{ background: "#2563EB", color: "#fff", fontFamily: "var(--font-body)", fontSize: "12px", fontWeight: 700, letterSpacing: "0.05em", padding: "7px 16px", borderRadius: "8px", textDecoration: "none" }}
           >
-            Upgrade to Plus →
+            Upgrade to {upgradeTarget} →
           </a>
           <button
             type="button"
@@ -372,6 +374,12 @@ function validateBuyerFields(f: { name: string; shopName: string; email: string;
 }
 
 function CustomersSection() {
+  const { has } = useAuth();
+  const isPro = has?.({ plan: "pro" }) ?? false;
+  const isPlus = has?.({ plan: "plus" }) ?? false;
+  const customerLimit = isPro ? Infinity : isPlus ? 200 : 10;
+  const userPlan = isPro ? "pro" : isPlus ? "starter" : "free";
+
   const [list, setList] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -461,9 +469,11 @@ function CustomersSection() {
           border: `1px solid ${D.borderFaint}`,
         }}
       >
-        <PlanUsageBar used={list.length} limit={10} label="Buyers" />
+        {customerLimit !== Infinity && (
+          <PlanUsageBar used={list.length} limit={customerLimit} label="Buyers" />
+        )}
         {planLimitInfo && (
-          <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} />
+          <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} userPlan={userPlan} />
         )}
 
         <form
@@ -1079,6 +1089,12 @@ function ProductCard({
 // ─── Products Section ─────────────────────────────────────────────────────────
 
 function ProductsSection() {
+  const { has } = useAuth();
+  const isPro = has?.({ plan: "pro" }) ?? false;
+  const isPlus = has?.({ plan: "plus" }) ?? false;
+  const productLimit = isPro || isPlus ? Infinity : 10;
+  const userPlan = isPro ? "pro" : isPlus ? "starter" : "free";
+
   const [list, setList] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -1324,9 +1340,11 @@ function ProductsSection() {
         )}
       </div>
 
-      <PlanUsageBar used={list.length} limit={10} label="Products" />
+      {productLimit !== Infinity && (
+        <PlanUsageBar used={list.length} limit={productLimit} label="Products" />
+      )}
       {planLimitInfo && (
-        <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} />
+        <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} userPlan={userPlan} />
       )}
 
       {/* Form card */}
@@ -2294,6 +2312,12 @@ function todayIso() {
 }
 
 function SalesSection() {
+  const { has } = useAuth();
+  const isPro = has?.({ plan: "pro" }) ?? false;
+  const isPlus = has?.({ plan: "plus" }) ?? false;
+  const invoiceLimit = isPro ? Infinity : isPlus ? 100 : 4;
+  const userPlan = isPro ? "pro" : isPlus ? "starter" : "free";
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [invoiceList, setInvoiceList] = useState<InvoiceRow[]>([]);
@@ -2664,9 +2688,11 @@ function SalesSection() {
         sub="Pick a buyer, add products, set a due date — DueMate handles the reminders"
       />
 
-      <PlanUsageBar used={invoicesThisMonth} limit={4} label="Invoices this month" />
+      {invoiceLimit !== Infinity && (
+        <PlanUsageBar used={invoicesThisMonth} limit={invoiceLimit} label="Invoices this month" />
+      )}
       {planLimitInfo && (
-        <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} />
+        <PlanLimitCard resource={planLimitInfo.resource} limit={planLimitInfo.limit} onDismiss={() => setPlanLimitInfo(null)} userPlan={userPlan} />
       )}
 
       {/* ── Invoice Form Card ── */}

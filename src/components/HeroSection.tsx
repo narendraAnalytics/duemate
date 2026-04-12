@@ -232,8 +232,8 @@ export default function HeroSection() {
             className="max-w-[18rem] sm:max-w-[22rem] text-sm sm:text-base leading-relaxed"
             style={{ color: "rgba(196, 207, 238, 0.6)" }}
           >
-            Upload invoices, let AI extract data, then sit back as smart
-            reminders go out via email &amp; WhatsApp — automatically.
+            Create invoices in seconds, record payments instantly, and let
+            smart reminders go out via email — automatically.
           </motion.p>
 
           {/* CTAs */}

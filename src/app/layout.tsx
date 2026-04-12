@@ -28,7 +28,7 @@ const serif = Cormorant_Garamond({
 export const metadata: Metadata = {
   title: "DueMate — AI-Powered Payment Reminders",
   description:
-    "Upload invoices, let AI extract data, then sit back as smart reminders go out automatically — email & WhatsApp.",
+    "Create invoices in seconds, record payments instantly, and let smart reminders go out via email — automatically.",
   icons: {
     icon: "https://res.cloudinary.com/dkqbzwicr/image/upload/q_auto/f_auto/v1775557266/logo_y06zwe.png",
     apple: "https://res.cloudinary.com/dkqbzwicr/image/upload/q_auto/f_auto/v1775557266/logo_y06zwe.png",
