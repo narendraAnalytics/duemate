@@ -80,6 +80,12 @@ export default function HowItWorksPage() {
     setMuted(v.muted);
   };
 
+  const skip = (seconds: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = Math.min(Math.max(0, v.currentTime + seconds), v.duration || 0);
+  };
+
   return (
     <main
       className="min-h-svh w-full"
@@ -199,15 +205,50 @@ export default function HowItWorksPage() {
                 "linear-gradient(to top, rgba(30,27,75,0.7) 0%, transparent 100%)",
             }}
           >
-            <button
-              type="button"
-              onClick={togglePlay}
-              className="flex items-center gap-2 text-sm font-medium transition-opacity duration-150 hover:opacity-80"
-              style={{ color: "rgba(255,255,255,0.9)" }}
-            >
-              {playing ? <Pause size={16} /> : <Play size={16} />}
-              {playing ? "Pause" : "Play"}
-            </button>
+            <div className="flex items-center gap-3">
+              {/* Play / Pause */}
+              <button
+                type="button"
+                onClick={togglePlay}
+                className="flex items-center gap-2 text-sm font-medium transition-opacity duration-150 hover:opacity-80"
+                style={{ color: "rgba(255,255,255,0.9)" }}
+              >
+                {playing ? <Pause size={16} /> : <Play size={16} />}
+                {playing ? "Pause" : "Play"}
+              </button>
+
+              {/* Skip back 10s */}
+              <button
+                type="button"
+                onClick={() => skip(-10)}
+                title="Back 10s"
+                className="flex items-center gap-1 text-xs font-medium transition-opacity duration-150 hover:opacity-80"
+                style={{ color: "rgba(255,255,255,0.75)" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 4v6h6" />
+                  <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+                  <text x="7" y="14" fontSize="7" fill="currentColor" stroke="none" fontWeight="bold">10</text>
+                </svg>
+                ‑10s
+              </button>
+
+              {/* Skip forward 10s */}
+              <button
+                type="button"
+                onClick={() => skip(10)}
+                title="Forward 10s"
+                className="flex items-center gap-1 text-xs font-medium transition-opacity duration-150 hover:opacity-80"
+                style={{ color: "rgba(255,255,255,0.75)" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 4v6h-6" />
+                  <path d="M20.49 15a9 9 0 1 1-.49-3.51" />
+                  <text x="7" y="14" fontSize="7" fill="currentColor" stroke="none" fontWeight="bold">10</text>
+                </svg>
+                +10s
+              </button>
+            </div>
 
             <button
               type="button"
