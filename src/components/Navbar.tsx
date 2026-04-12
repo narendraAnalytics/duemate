@@ -79,7 +79,8 @@ export default function Navbar() {
       router.push("/sign-in");
       return;
     }
-    router.push(href);
+    const resolvedHref = href === "/#how-it-works" ? "/how-it-works" : href;
+    router.push(resolvedHref);
   };
 
   useEffect(() => {

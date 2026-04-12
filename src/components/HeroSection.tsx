@@ -266,7 +266,12 @@ export default function HeroSection() {
             />
 
             <Link
-              href="#features"
+              href={
+                isSignedIn
+                  ? "/how-it-works"
+                  : "https://res.cloudinary.com/dkqbzwicr/video/upload/q_auto/f_auto/v1776003656/duematevideowebm_ojggt5.webm"
+              }
+              {...(!isSignedIn && { target: "_blank", rel: "noopener noreferrer" })}
               className="hidden sm:inline text-sm font-medium transition-colors duration-200"
               style={{ color: "rgba(196, 207, 238, 0.55)" }}
               onMouseEnter={(e) =>

@@ -35,7 +35,7 @@ npx tsc --noEmit       # Type-check without building
   - **Bebas Neue** → `--font-display` / `font-heading` (headlines)
   - **Space Grotesk** → `--font-body` / `font-sans` (body)
   - **Cormorant Garamond** → `--font-serif` (menu numerals, italic accent text)
-- /— accessible pre-built components
+- shadcn/ui — accessible pre-built components
 - Lucide React — icons
 - React Hook Form + Zod — type-safe form validation
 
@@ -77,7 +77,7 @@ Fluid type scale in `:root` via `clamp()` — `--text-xs` through `--text-hero`.
 - `<ClerkProvider>` wraps children inside `<body>` in `src/app/layout.tsx`
 - Use `<Show when="signed-in">` / `<Show when="signed-out">` from `@clerk/nextjs` — **NOT** deprecated `<SignedIn>` / `<SignedOut>`
 - Use `useUser()` hook in client components to read auth state
-- Call `getOrCreateUser()` from `src/lib/auth.ts` at the top of every authenticated API route — lazy DB user creation on first API call, no webhook sync needed
+- Call `getOrCreateUser()` from `src/lib/auth.ts` at the top of every authenticated API route — lazy DB user creation on first API call, no webhook sync needed. It also syncs `users.plan` from Clerk Billing on every call: reads `has({ plan: 'plus' })` / `has({ plan: 'pro' })` and runs an `UPDATE` if the DB value differs. This is the only plan-sync mechanism — **no Clerk webhooks are used**.
 
 ## Database — 8 Tables (live on Neon)
 
