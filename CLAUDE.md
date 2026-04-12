@@ -105,11 +105,12 @@ Forgetting `await params` causes silent "Not found" errors as `id` resolves to u
 Large client component (`'use client'`). All tabs live in one file. Redirects to `/sign-in` if not authenticated.
 
 ### Tab Architecture
-Three tabs rendered by `<DashboardTabs>` → each tab is its own function component defined in the same file:
+Four tabs (`Tab` type: `"customers" | "products" | "sales" | "insights"`) managed by `activeTab` state + a `TABS` config array. Each tab is its own function component defined in the same file:
 
 - **I. Buyers (`CustomersSection`)** — Add/edit/list buyers. Inline row edit with `editingId` state. Validation: phone must be 10 digits (`/^\d{10}$/`), GSTIN must match `/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/`. `validateBuyerFields()` is a module-level shared validator.
 - **II. Products (`ProductsSection` + `ProductCard`)** — Includes a **Saved Suppliers** sub-section (add/edit/list) above the product form, plus a "Auto-fill from Saved Supplier" dropdown that fills supplierShop/Phone/Gstin on select. Add products via form; each saved product renders as a `ProductCard` with inline edit (`editing` state inside the card). Form order: Purchase Rate → Selling Rate. Purchase Total auto-computes from `purchaseRate × quantity × (1 + gstRate/100)`. ProductCard view shows margin % (selling − purchase rate).
 - **III. Sales (`SalesSection` + `InvoiceList`)** — Invoice creation form with preview modal before saving. `InvoiceList` renders saved invoices as expandable rows. Expanded panel shows full financial breakdown + **Record Payment** inline form (calls `PATCH /api/invoices/[id]`).
+- **IV. Insights (`InsightsSection`)** — Read-only analytics dashboard. Computes revenue, collection rate, outstanding balance, overdue stats, top customer/product from the loaded invoice list. Calls `POST /api/analytics/ai-summary` to display a Gemini-generated business health summary (temperature 0.4, re-fetchable via ↻ button). Renders visual charts/stat cards; only shown when at least one invoice exists.
 
 ### Dashboard Internal Components
 Defined inside `page.tsx`, not as separate files:
@@ -151,6 +152,7 @@ All routes call `getOrCreateUser()` first, validate with Zod, return `{ success,
 | `/api/invoices/[id]` | PATCH | Record payment — adds `additionalPayment` to `paidAmount`/`paidCash`/`paidOnline`, appends to `paymentHistory`, sets `lastPaymentAt`, optionally stores `paymentReference`/`paymentNotes`. Sets status to `"paid"` when balance reaches zero. Returns `emailSkipped: boolean` to indicate whether the receipt email was suppressed by the free plan cap. |
 | `/api/suppliers` | GET, POST | List / create suppliers |
 | `/api/suppliers/[id]` | PATCH | Update supplier details |
+| `/api/analytics/ai-summary` | POST | Gemini-powered business health summary — accepts aggregated invoice stats (revenue, collected, outstanding, overdueCount, overdueAmount, topCustomer, topProduct, invoiceCount), returns 2–3 sentence advisory string |
 
 ### Free Plan Enforcement
 POST routes for customers, products, and invoices check `user.plan === 'free'` and return a 403 with `{ success: false, planLimit: true, limit, used, remaining, resource }` when limits are hit. Dashboard detects `json.planLimit` and shows `PlanLimitCard` instead of a plain error.
@@ -176,6 +178,8 @@ The `PATCH /api/invoices/[id]` route pre-checks the email cap synchronously befo
 | `src/app/layout.tsx` | Fonts (3 families), ClerkProvider, metadata |
 | `src/app/page.tsx` | Landing page |
 | `src/app/pricing/page.tsx` | Pricing page — server component, requires auth (`auth()` redirect), renders Clerk `<PricingTable />` |
+| `src/app/features/page.tsx` | Features marketing page — client component, animated feature slider with Cloudinary images |
+| `src/app/api/analytics/ai-summary/route.ts` | Gemini business health summary — POST, no plan gating, uses `GEMINI_MODEL` env var |
 | `src/app/dashboard/page.tsx` | Dashboard — all tabs + internal components (1 large file) |
 | `src/app/api/customers/route.ts` | Buyers list + create (free plan: blocks at 10 total) |
 | `src/app/api/suppliers/route.ts` | Suppliers list + create |

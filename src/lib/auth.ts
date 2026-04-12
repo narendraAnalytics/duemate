@@ -5,11 +5,28 @@ import { eq } from "drizzle-orm";
 
 export async function getOrCreateUser() {
   try {
-    const { userId } = await auth();
+    const { userId, has } = await auth();
     if (!userId) throw new Error("Unauthorized");
 
+    // Clerk Billing is the source of truth for the plan
+    let clerkPlan: 'free' | 'starter' | 'pro' = 'free';
+    if (has({ plan: 'pro' })) clerkPlan = 'pro';
+    else if (has({ plan: 'starter' })) clerkPlan = 'starter';
+
     const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-    if (rows[0]) return rows[0];
+
+    if (rows[0]) {
+      // Sync plan whenever Clerk Billing reflects a change
+      if (rows[0].plan !== clerkPlan) {
+        const [updated] = await db
+          .update(users)
+          .set({ plan: clerkPlan })
+          .where(eq(users.id, userId))
+          .returning();
+        return updated;
+      }
+      return rows[0];
+    }
 
     const clerkUser = await currentUser();
     const [created] = await db
@@ -18,6 +35,7 @@ export async function getOrCreateUser() {
         id: userId,
         email: clerkUser?.emailAddresses[0]?.emailAddress ?? "",
         name: clerkUser?.fullName ?? clerkUser?.firstName ?? "",
+        plan: clerkPlan,
       })
       .returning();
 
