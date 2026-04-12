@@ -1,12 +1,40 @@
-videosurl :
-1. https://res.cloudinary.com/dkqbzwicr/video/upload/q_auto/f_auto/v1775556989/video3_dzpexe.webm
+features url : 
 
-2 .  https://res.cloudinary.com/dkqbzwicr/video/upload/q_auto/f_auto/v1775562834/video2_lvfcfh.webm
+feature 2 : https://res.cloudinary.com/dkqbzwicr/image/upload/q_auto/f_auto/v1775962372/feature2_ggiuos.png
 
-logo url : 
-https://res.cloudinary.com/dkqbzwicr/image/upload/q_auto/f_auto/v1775557266/logo_y06zwe.png
+SMART INVOICE CREATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-https://pendragoncycle.com/
+  Description
+  ───────────
+  Create detailed invoices with line items, GST rates, discounts
+  (flat or percentage), and taxes — all computed live before saving.
+  A full preview modal shows the final invoice layout before it's
+  committed to the database.
+
+  Problem Solved
+  ──────────────
+  Business owners waste time writing invoices by hand or in
+  spreadsheets with no preview, leading to errors they only catch
+  after sending.
+
+  How It Works
+  ────────────
+  • Select a saved buyer → fields auto-fill (name, shop, GSTIN)
+  • Add line items from your saved products catalogue
+  • Set discount type (flat ₹ or %), GST/tax rate
+  • Click "Preview Invoice" → review full breakdown
+  • Click "Save Invoice" → stock quantities auto-decrement,
+    buyer receives an email notification instantly
+
+  Key Details
+  ───────────
+  • Subtotal → Discount → After-Discount → Tax → Total
+  • Invoice number auto-generated
+  • Supports INR and other currencies
+  • Free plan: 4 invoices/month
 
 
-admin@buildflows.shop
+
+
+// # admin@buildflows.shop

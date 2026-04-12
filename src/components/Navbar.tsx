@@ -8,7 +8,7 @@ import { UserButton, Show, useUser, useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
 const NAV_LINKS = [
-  { href: "/#features",     label: "Features",     numeral: "I" },
+  { href: "/features",       label: "Features",     numeral: "I" },
   { href: "/#how-it-works", label: "How It Works", numeral: "II" },
   { href: "/pricing",       label: "Pricing",      numeral: "III" },
   { href: "/dashboard",     label: "Dashboard",    numeral: "IV" },

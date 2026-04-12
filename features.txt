@@ -1,0 +1,409 @@
+================================================================
+  DUEMATE — FEATURE DOCUMENTATION
+  AI-Powered Invoice & Payment Reminder SaaS
+================================================================
+
+  WHAT IS DUEMATE?
+  ────────────────
+  DueMate is an AI-powered invoicing and payment reminder SaaS
+  built for small and medium businesses in India. It solves one
+  of the most persistent problems in small business operations:
+  getting paid on time.
+
+  Most small businesses — traders, wholesalers, manufacturers,
+  freelancers — create invoices manually, track payments in
+  notebooks or spreadsheets, and chase buyers through awkward
+  phone calls or messages. Reminders get forgotten. Payments get
+  delayed. Cash flow suffers.
+
+  DueMate automates the entire payment collection cycle — from
+  the moment an invoice is created to the day it's paid — so
+  business owners never have to manually chase a payment again.
+
+  THE CORE IDEA
+  ─────────────
+  Create an invoice → buyer gets notified instantly.
+  Record a payment → buyer gets a receipt automatically.
+  Invoice goes overdue → buyer gets a reminder every day at
+  11 AM without you lifting a finger.
+
+  All of this happens in the background, reliably, even if
+  you close the app.
+
+  WHO IS IT FOR?
+  ──────────────
+  · Wholesale traders managing dozens of buyers each month
+  · Small manufacturers billing on credit terms (net 15/30)
+  · Service businesses that invoice clients regularly
+  · Anyone tired of asking "did you get my invoice?" manually
+
+  HOW IT STANDS APART
+  ────────────────────
+  · Zero manual follow-up — reminders run on autopilot daily
+  · Smart email cap — free plan users always get their overdue
+    reminder delivered, even with a 3-email/buyer/month limit
+  · Buyer & supplier memory — save once, reuse forever
+  · Live stock tracking — inventory decrements on every sale
+  · Built for India — GST rates, GSTIN validation, INR default,
+    HSN codes, and Indian number formatting throughout
+  · No bloat — create an invoice in under 60 seconds
+
+  TECHNOLOGY BACKBONE
+  ───────────────────
+  · Inngest   — durable background jobs for reminders
+                (survives server restarts, never drops a job)
+  · Resend    — transactional email delivery with audit log
+  · Gemini    — AI invoice data extraction (Plus/Pro plans)
+  · WhatsApp  — Meta Cloud API reminders (Plus/Pro plans)
+  · Neon      — serverless PostgreSQL for instant scale
+  · Clerk     — authentication and subscription billing
+  · Vercel    — global edge deployment
+
+  BUSINESS MODEL
+  ──────────────
+  Free  — Start immediately, no card required
+          4 invoices/mo · 10 buyers · 10 products · 3 emails/buyer
+  Plus  — $9/mo  — Growing businesses
+          100 invoices · 200 buyers · WhatsApp · AI extraction
+  Pro   — $29/mo — Power users
+          Unlimited everything · Zoho Books sync · 5 team seats
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+01. SMART INVOICE CREATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Description
+  ───────────
+  Create detailed invoices with line items, GST rates, discounts
+  (flat or percentage), and taxes — all computed live before saving.
+  A full preview modal shows the final invoice layout before it's
+  committed to the database.
+
+  Problem Solved
+  ──────────────
+  Business owners waste time writing invoices by hand or in
+  spreadsheets with no preview, leading to errors they only catch
+  after sending.
+
+  How It Works
+  ────────────
+  • Select a saved buyer → fields auto-fill (name, shop, GSTIN)
+  • Add line items from your saved products catalogue
+  • Set discount type (flat ₹ or %), GST/tax rate
+  • Click "Preview Invoice" → review full breakdown
+  • Click "Save Invoice" → stock quantities auto-decrement,
+    buyer receives an email notification instantly
+
+  Key Details
+  ───────────
+  • Subtotal → Discount → After-Discount → Tax → Total
+  • Invoice number auto-generated
+  • Supports INR and other currencies
+  • Free plan: 4 invoices/month
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+02. AUTOMATED PAYMENT REMINDERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Description
+  ───────────
+  DueMate automatically sends payment reminders to buyers when
+  invoices go overdue — without any manual action from the business
+  owner. Reminders are sent daily at 11:00 AM IST for all overdue
+  invoices, grouped by buyer into a single consolidated email.
+
+  Problem Solved
+  ──────────────
+  Chasing payments manually is awkward and time-consuming. Most
+  small businesses either forget to follow up or feel uncomfortable
+  doing it repeatedly — leading to delayed cash flow.
+
+  How It Works
+  ────────────
+  • Every day at 11 AM IST, a background job scans all invoices
+  • Pending invoices past their due date are marked "Overdue"
+  • One reminder email is sent per buyer listing all overdue bills
+  • Overdue badges show red (>7 days) or amber (≤7 days)
+  • Includes a "pay on time & save" incentive message
+
+  Key Details
+  ───────────
+  • Powered by Inngest (durable background jobs — survives crashes)
+  • Free plan: max 3 reminder emails per buyer per month
+  • Slot 3 is always reserved for the overdue reminder
+    (slots 1 & 2 used for invoice created + payment receipt)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+03. INSTANT INVOICE & PAYMENT EMAIL NOTIFICATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Description
+  ───────────
+  Every key transaction automatically triggers a professionally
+  designed email to the buyer — no manual sending required.
+  Three email types cover the full payment lifecycle.
+
+  Problem Solved
+  ──────────────
+  Buyers often forget about invoices or aren't sure if their
+  payment was received. Manual confirmation emails take time
+  and often get skipped entirely.
+
+  How It Works
+  ────────────
+  • Invoice Created  → "Invoice #001 from Your Business" email
+    (line items table, totals, due date, GSTIN details)
+  • Payment Recorded → "Payment Confirmed" receipt email
+    (PAID/PARTIAL banner, amount, mode, date, reference)
+  • Overdue          → "Friendly reminder" email with all
+    outstanding invoices listed
+
+  Key Details
+  ───────────
+  • Each email template has its own colour theme:
+    Indigo (invoice) · Green (receipt) · Amber (reminder)
+  • Owner's email is set as reply-to on every email
+  • Email failure never blocks the payment save — fires async
+  • Delivery tracked in notifications audit log
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+04. PAYMENT RECORDING & HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Description
+  ───────────
+  Record partial or full payments against any invoice directly
+  from the dashboard. Each payment is logged with its mode,
+  date, amount, and optional reference/notes — building a full
+  payment history per invoice.
+
+  Problem Solved
+  ──────────────
+  Many buyers pay in installments. Without installment tracking,
+  owners lose sight of how much is still owed and when payments
+  were received.
+
+  How It Works
+  ────────────
+  • Expand any invoice → click "+ Record Payment"
+  • Enter amount (capped at balance due, amber warning if over),
+    payment type (Cash / Online), reference ID, notes
+  • Balance auto-updates; status flips to "Paid" when cleared
+  • Full history of all payments visible in the invoice panel
+
+  Key Details
+  ───────────
+  • Tracks paidCash and paidOnline separately
+  • lastPaymentAt timestamp recorded per payment
+  • Payment receipt email sent automatically (free plan: 1/month
+    max to preserve slot for overdue reminder)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+05. BUYER (CUSTOMER) MANAGEMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Description
+  ───────────
+  Save buyer details once — name, shop name, email, phone,
+  GSTIN — and reuse them across all invoices with a single
+  dropdown selection.
+
+  Problem Solved
+  ──────────────
+  Typing the same buyer details for every invoice is tedious
+  and error-prone. Wrong email addresses mean reminders never
+  reach the buyer.
+
+  How It Works
+  ────────────
+  • Add buyers in the Buyers tab with full validation
+  • GSTIN validated against Indian format
+  • When creating an invoice, select buyer from dropdown
+    → all fields auto-fill instantly
+  • Edit buyer details inline at any time
+
+  Key Details
+  ───────────
+  • Free plan: up to 10 buyers total
+  • lastEmailSentAt tracked per buyer for audit purposes
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+06. PRODUCT CATALOGUE & INVENTORY TRACKING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Description
+  ───────────
+  Maintain a catalogue of products with selling rate, purchase
+  rate, GST rate, HSN code, and live stock count. When a product
+  is added to an invoice and saved, stock quantity automatically
+  decrements.
+
+  Problem Solved
+  ──────────────
+  Small businesses don't know their stock levels or margins
+  in real time. They also retype product details on every invoice
+  instead of picking from a saved list.
+
+  How It Works
+  ────────────
+  • Add products with purchase rate, selling rate, unit, GST %
+  • Purchase Total auto-computes (rate × qty × (1 + GST/100))
+  • Margin % shown on each product card (selling vs purchase)
+  • Stock badge: Green (good) · Amber (≤5 left) · Red (out)
+  • Invoice save decrements stock server-side automatically
+
+  Key Details
+  ───────────
+  • Free plan: up to 10 products total
+  • Supports units: pcs, kg, g, litre, ml, box, dozen, metre, etc.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+07. SUPPLIER MANAGEMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Description
+  ───────────
+  Save your supplier details once — supplier name, shop name,
+  phone, GSTIN — and auto-fill them when adding new products.
+  No more retyping the same supplier information repeatedly.
+
+  Problem Solved
+  ──────────────
+  Every time a business owner adds a product to their catalogue,
+  they have to retype the supplier's shop name, phone, and GSTIN
+  from scratch — even for products from the same supplier.
+
+  How It Works
+  ────────────
+  • Add suppliers in the Saved Suppliers section (Products tab)
+  • When adding a product, select a supplier from the
+    "Auto-fill from Saved Supplier" dropdown
+  • Shop name, phone, and GSTIN fill instantly
+  • Override any field manually if needed
+  • Edit saved suppliers inline at any time
+
+  Key Details
+  ───────────
+  • Completely separate from the buyers system
+  • Suppliers are private to each business account
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+08. BUSINESS INSIGHTS & ANALYTICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Description
+  ───────────
+  Visual dashboard with charts showing revenue trends, invoice
+  status distribution, and payment behaviour over time — giving
+  business owners a clear picture of their cash flow health.
+
+  Problem Solved
+  ──────────────
+  Most small business owners have no idea how much they're owed,
+  how much they've collected, or which buyers consistently pay late
+  — until it becomes a serious cash flow problem.
+
+  How It Works
+  ────────────
+  • Insights tab in the dashboard
+  • Line chart: revenue collected over time
+  • Bar chart: invoices created per month
+  • Pie chart: invoice status breakdown
+    (Paid / Pending / Overdue / Cancelled)
+  • Summary cards: total invoiced, total collected, total overdue
+
+  Key Details
+  ───────────
+  • All data computed from live invoice records
+  • Updates in real time as payments are recorded
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+09. FREE PLAN WITH SMART LIMITS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Description
+  ───────────
+  DueMate is free to start. The free plan includes core invoice
+  and reminder functionality with sensible usage limits. When a
+  limit is hit, the dashboard shows a clear upgrade prompt —
+  nothing breaks silently.
+
+  Problem Solved
+  ──────────────
+  Most SaaS tools either lock all features behind a paywall or
+  let users discover limits only after hitting errors with no
+  explanation.
+
+  How It Works
+  ────────────
+  • Progress bars show used/limit for invoices, buyers, products
+  • When a limit is reached, a lock card explains the cap and
+    links directly to the pricing/upgrade page
+  • Email cap: 3 emails/buyer/month, intelligently distributed:
+    1 for invoice notification, 1 for payment receipt, 1 reserved
+    for overdue reminder — so reminders always get through
+
+  Key Details
+  ───────────
+  Free Plan Limits:
+  • 4 invoices / month
+  • 10 buyers total
+  • 10 products total
+  • 3 emails / buyer / month
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. MULTI-TIER SUBSCRIPTION PLANS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Description
+  ───────────
+  Three plans designed to scale with the business — Free for
+  getting started, Plus ($9/mo) for growing businesses, and
+  Pro ($29/mo) for power users needing advanced integrations
+  and team access.
+
+  Problem Solved
+  ──────────────
+  Small businesses need a tool that grows with them — not one
+  that forces an expensive upgrade the moment they start.
+
+  Plans at a Glance
+  ─────────────────
+  FREE         — 4 invoices/mo · 10 buyers · 10 products
+  PLUS  $9/mo  — 100 invoices/mo · 200 buyers · unlimited products
+                 · unlimited emails · WhatsApp reminders · AI extraction (50/mo)
+  PRO   $29/mo — Unlimited everything · Zoho Books sync · 5 team members
+
+  Key Details
+  ───────────
+  • Plan badge (FREE/PLUS/PRO) shown in navbar at all times
+  • Billing managed by Clerk — no custom payment code needed
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  COMING SOON
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  11. AI Invoice Data Extraction (Gemini 3.1 Flash-Lite)
+      Upload an invoice image or PDF → AI reads line items,
+      amounts, and dates automatically.
+
+  12. WhatsApp Payment Reminders
+      Send reminders via Meta WhatsApp Cloud API directly to
+      buyers' phone numbers — no third-party BSP needed.
+
+  13. Zoho Books Integration (Pro)
+      One-click sync of invoices and contacts to Zoho Books
+      via OAuth 2.0 — keeps accounting up to date automatically.
+
+================================================================
